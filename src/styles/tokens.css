@@ -1,0 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap');
+
+:root {
+  color-scheme: light;
+  --bg-canvas: #f3f6fb;
+  --bg-canvas-strong: #edf2f8;
+  --bg-surface: rgba(255, 255, 255, 0.88);
+  --bg-surface-strong: #ffffff;
+  --bg-soft: #f7f9fc;
+  --bg-soft-strong: #eef3fb;
+  --text-strong: #0f172a;
+  --text-body: #334155;
+  --text-soft: #64748b;
+  --line-soft: rgba(148, 163, 184, 0.22);
+  --line-strong: rgba(148, 163, 184, 0.34);
+  --accent: #2563eb;
+  --accent-strong: #1d4ed8;
+  --accent-soft: rgba(37, 99, 235, 0.12);
+  --accent-contrast: #ffffff;
+  --success: #15803d;
+  --danger: #b42318;
+  --shadow-soft: 0 22px 48px rgba(15, 23, 42, 0.08);
+  --shadow-card: 0 10px 24px rgba(15, 23, 42, 0.06);
+  --radius-xl: 28px;
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+  --font-display: 'Newsreader', Georgia, serif;
+  --font-body: 'Instrument Sans', 'Segoe UI', sans-serif;
+  --container-width: 1440px;
+}

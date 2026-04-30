@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Package-manager lockfiles not used by this project
+package-lock.json
+yarn.lock
+bun.lockb
+
+# Build outputs
+dist/
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+
+# Test artifacts
+coverage/
+test-results/
+playwright-report/
+
+# Local/generated artifacts
+.artifacts/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS/editor files
+.DS_Store
+.idea/
+.vscode/
+.claude/
