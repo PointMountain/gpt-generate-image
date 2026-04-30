@@ -14,38 +14,47 @@ export function HistoryPanel({
   onDelete,
 }: HistoryPanelProps) {
   return (
-    <section>
-      <div className="section-heading">
+    <section className="inspiration-surface">
+      <div className="section-heading inspiration-surface__header">
         <div>
+          <p className="section-heading__eyebrow">Recent Inspiration</p>
           <h3>最近历史</h3>
-          <p>保留最近生成记录，方便回填提示词或复用结果图。</p>
+          <p>把生成记录作为灵感资产复用，快速回填提示词或继续图生图迭代。</p>
         </div>
+        {entries.length ? <span className="surface-header__badge">{entries.length} 条记录</span> : null}
       </div>
 
       <div className="stack-list">
         {entries.length ? (
           entries.map((entry) => (
-            <article key={entry.id} className="stack-card">
+            <article key={entry.id} className="stack-card stack-card--asset">
               <div className="stack-card__header">
-                <strong>{entry.providerLabel}</strong>
+                <div>
+                  <strong>{entry.providerLabel}</strong>
+                  <p className="stack-card__meta">{entry.modelId || '未指定模型'} · {entry.size}</p>
+                </div>
                 <span>{entry.createdAt.slice(11, 16)}</span>
               </div>
               <p className="stack-card__prompt">{entry.prompt}</p>
-              <div className="stack-card__thumb-row">
-                {entry.images.slice(0, 2).map((image) => (
-                  <button
-                    key={image.id}
-                    className="stack-card__thumb"
-                    type="button"
-                    onClick={() => onUseImageAsReference(image)}
-                  >
-                    <img src={image.src} alt="历史结果缩略图" />
-                  </button>
-                ))}
-              </div>
+              {entry.images.length ? (
+                <div className="stack-card__thumb-row">
+                  {entry.images.slice(0, 2).map((image, index) => (
+                    <button
+                      key={image.id}
+                      className="stack-card__thumb"
+                      type="button"
+                      onClick={() => onUseImageAsReference(image)}
+                      aria-label={`将历史结果 ${index + 1} 设为参考图`}
+                    >
+                      <img src={image.src} alt="历史结果缩略图" />
+                    </button>
+                  ))}
+                  {entry.images.length > 2 ? <span className="stack-card__count">+{entry.images.length - 2}</span> : null}
+                </div>
+              ) : null}
               <div className="button-row">
                 <button className="button button--ghost" type="button" onClick={() => onApply(entry)}>
-                  回填到编辑器
+                  复用提示词
                 </button>
                 <button
                   className="button button--danger"
@@ -58,7 +67,7 @@ export function HistoryPanel({
             </article>
           ))
         ) : (
-          <p className="provider-list__empty">暂时还没有历史记录。</p>
+          <p className="provider-list__empty">暂时还没有历史记录，生成后的作品会沉淀在这里。</p>
         )}
       </div>
     </section>

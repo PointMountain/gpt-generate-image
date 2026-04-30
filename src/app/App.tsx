@@ -136,11 +136,23 @@ export function App() {
   }, [presets]);
 
   useEffect(() => {
+    let isMounted = true;
+
     void listHistoryEntries()
-      .then(setHistoryEntries)
+      .then((entries) => {
+        if (isMounted) {
+          setHistoryEntries(entries);
+        }
+      })
       .catch(() => {
-        setToastMessage('历史记录加载失败，当前会话仍可继续。');
+        if (isMounted) {
+          setToastMessage('历史记录加载失败，当前会话仍可继续。');
+        }
       });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -498,14 +510,76 @@ export function App() {
     </>
   );
 
-  const lowerPanel = (
-    <div className="bottom-grid">
+  const galleryStage = (
+    <>
       <ResultGallery
         results={results}
         onPreview={setPreviewImage}
         onDownload={(image, index) => void downloadImage(image, index)}
         onUseAsReference={(image) => void handleReuseImageAsReference(image)}
         onReusePrompt={() => setToastMessage('当前编辑器已经保留这轮提示词，可直接继续改写。')}
+      />
+
+      {isGenerating ? (
+        <div className="top-gap">
+          <LoadingState
+            title="正在生成图片"
+            body="请求已经发出。若当前 provider 较慢，请保持页面开启并等待返回。"
+          />
+        </div>
+      ) : null}
+
+      {generationError ? (
+        <div className="section-card top-gap">
+          <h3>这次生成没有成功</h3>
+          <p>{generationError.message}</p>
+          {generationError.recommendation ? (
+            <p className="field__hint">{generationError.recommendation}</p>
+          ) : null}
+          <ErrorDetailDrawer summary="展开 provider 返回详情" detail={generationError.detail} />
+        </div>
+      ) : null}
+    </>
+  );
+
+  const composer = (
+    <GenerationForm
+      form={form}
+      selectedModelLabel={selectedModelId}
+      supportsReferenceImages={capabilities.canUseReferenceImages}
+      canGenerate={Boolean(providerDraft.apiKey && providerDraft.baseUrl && form.prompt.trim())}
+      isGenerating={isGenerating}
+      onChangeForm={setForm}
+      onGenerate={() => void handleGenerate()}
+      onClear={clearForm}
+      onSelectReferenceFile={setReferenceFile}
+    />
+  );
+
+  const rail = (
+    <>
+      <ProviderSettingsPanel
+        providers={providerState.providers}
+        activeProviderId={providerState.activeProviderId}
+        draft={providerDraft}
+        errors={providerErrors}
+        discoveryState={discoveryState}
+        profile={providerProfile}
+        selectedModelId={selectedModelId}
+        onSelectProvider={handleSelectProvider}
+        onCreateNewProvider={handleCreateNewProvider}
+        onDuplicateProvider={handleDuplicateProvider}
+        onDeleteProvider={handleDeleteProvider}
+        onDraftChange={setProviderDraft}
+        onSaveProvider={handleSaveProvider}
+        onDiscoverModels={() => void discoverModelsForDraft()}
+        onSelectModel={(modelId) =>
+          setProviderDraft((previous) => ({
+            ...previous,
+            preferredModel: modelId,
+          }))
+        }
+        onApplyProfileDefaults={applyProviderProfileDefaults}
       />
       <HistoryPanel
         entries={historyEntries}
@@ -522,7 +596,7 @@ export function App() {
         onApply={applyPreset}
         onDelete={(presetId) => setPresets((previous) => removePreset(previous, presetId))}
       />
-    </div>
+    </>
   );
 
   return (
@@ -531,65 +605,10 @@ export function App() {
       footer={<p>本地模式。key 仅保存在当前浏览器；若遇到 CORS，可继续使用本地代理或再包装桌面壳。</p>}
     >
       <WorkbenchFrame
-        sidebar={
-          <ProviderSettingsPanel
-            providers={providerState.providers}
-            activeProviderId={providerState.activeProviderId}
-            draft={providerDraft}
-            errors={providerErrors}
-            discoveryState={discoveryState}
-            profile={providerProfile}
-            selectedModelId={selectedModelId}
-            onSelectProvider={handleSelectProvider}
-            onCreateNewProvider={handleCreateNewProvider}
-            onDuplicateProvider={handleDuplicateProvider}
-            onDeleteProvider={handleDeleteProvider}
-            onDraftChange={setProviderDraft}
-            onSaveProvider={handleSaveProvider}
-            onDiscoverModels={() => void discoverModelsForDraft()}
-            onSelectModel={(modelId) =>
-              setProviderDraft((previous) => ({
-                ...previous,
-                preferredModel: modelId,
-              }))
-            }
-            onApplyProfileDefaults={applyProviderProfileDefaults}
-          />
-        }
-        lowerPanel={lowerPanel}
-      >
-        <GenerationForm
-          form={form}
-          selectedModelLabel={selectedModelId}
-          supportsReferenceImages={capabilities.canUseReferenceImages}
-          canGenerate={Boolean(providerDraft.apiKey && providerDraft.baseUrl && form.prompt.trim())}
-          isGenerating={isGenerating}
-          onChangeForm={setForm}
-          onGenerate={() => void handleGenerate()}
-          onClear={clearForm}
-          onSelectReferenceFile={setReferenceFile}
-        />
-
-        {isGenerating ? (
-          <div className="top-gap">
-            <LoadingState
-              title="正在生成图片"
-              body="请求已经发出。若当前 provider 较慢，请保持页面开启并等待返回。"
-            />
-          </div>
-        ) : null}
-
-        {generationError ? (
-          <div className="section-card top-gap">
-            <h3>这次生成没有成功</h3>
-            <p>{generationError.message}</p>
-            {generationError.recommendation ? (
-              <p className="field__hint">{generationError.recommendation}</p>
-            ) : null}
-            <ErrorDetailDrawer summary="展开 provider 返回详情" detail={generationError.detail} />
-          </div>
-        ) : null}
-      </WorkbenchFrame>
+        gallery={galleryStage}
+        composer={composer}
+        rail={rail}
+      />
 
       <ToastRegion message={toastMessage} />
       <ResultPreviewModal image={previewImage} onClose={() => setPreviewImage(null)} />
