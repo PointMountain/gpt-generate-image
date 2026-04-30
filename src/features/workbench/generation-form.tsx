@@ -71,16 +71,22 @@ export function GenerationForm({
   onClear,
   onSelectReferenceFile,
 }: GenerationFormProps) {
+  const hasReferenceImage = form.mode === 'reference' && Boolean(form.referencePreviewUrl);
+
   return (
-    <div className="panel-grid">
-      <div className="surface-header">
+    <div className="composer-panel">
+      <div className="surface-header surface-header--tight">
         <div>
-          <h2>生成</h2>
-          <p>写提示词、选择模式并提交请求。连接和兼容设置放在右侧处理。</p>
+          <p className="section-heading__eyebrow">Create</p>
+          <h2>创作下一轮</h2>
+          <p>写提示词，保留常用参数，继续把结果推入上方灵感画廊。</p>
         </div>
-        <span className="surface-header__badge">
-          当前模型：{selectedModelLabel || '未选择'}
-        </span>
+        <div className="composer-panel__badges">
+          <span className="surface-header__badge">
+            当前模型：{selectedModelLabel || '未选择'}
+          </span>
+          {hasReferenceImage ? <span className="surface-header__badge">参考图已附加</span> : null}
+        </div>
       </div>
 
       <PromptEditor
@@ -90,28 +96,30 @@ export function GenerationForm({
         onChangeNegativePrompt={(value) => onChangeForm({ ...form, negativePrompt: value })}
       />
 
-      <ReferenceImageDropzone
-        mode={form.mode}
-        previewUrl={form.referencePreviewUrl}
-        fileName={form.referenceFile?.name ?? ''}
-        supportsReferenceImages={supportsReferenceImages}
-        onModeChange={(mode) => onChangeForm({ ...form, mode })}
-        onSelectFile={onSelectReferenceFile}
-        onClear={() => onSelectReferenceFile(null)}
-      />
+      <div className="composer-panel__controls">
+        <ReferenceImageDropzone
+          mode={form.mode}
+          previewUrl={form.referencePreviewUrl}
+          fileName={form.referenceFile?.name ?? ''}
+          supportsReferenceImages={supportsReferenceImages}
+          onModeChange={(mode) => onChangeForm({ ...form, mode })}
+          onSelectFile={onSelectReferenceFile}
+          onClear={() => onSelectReferenceFile(null)}
+        />
 
-      <GenerationControls
-        size={form.size}
-        count={form.count}
-        quality={form.quality}
-        outputFormat={form.outputFormat}
-        onChange={(field, value) =>
-          onChangeForm({
-            ...form,
-            [field]: field === 'count' ? Number(value) : value,
-          })
-        }
-      />
+        <GenerationControls
+          size={form.size}
+          count={form.count}
+          quality={form.quality}
+          outputFormat={form.outputFormat}
+          onChange={(field, value) =>
+            onChangeForm({
+              ...form,
+              [field]: field === 'count' ? Number(value) : value,
+            })
+          }
+        />
+      </div>
 
       <GenerationActions
         canGenerate={canGenerate}

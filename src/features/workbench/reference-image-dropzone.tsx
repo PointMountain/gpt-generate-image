@@ -17,30 +17,34 @@ export function ReferenceImageDropzone({
   onSelectFile,
   onClear,
 }: ReferenceImageDropzoneProps) {
+  const hasReferenceImage = mode === 'reference' && Boolean(previewUrl);
+
   return (
-    <div className="section-card">
-      <div className="list-header">
+    <div className="reference-dropzone-card">
+      <div className="list-header list-header--compact">
         <div>
-          <h3>参考图</h3>
-          <p>可上传本地图片，也可以直接复用结果区里的图片。</p>
+          <h3>模式</h3>
+          <p>{hasReferenceImage ? '下次生成会带上参考图。' : '文生图优先，必要时附加参考图。'}</p>
         </div>
-        <div className="button-row">
-          <button
-            type="button"
-            className={`button ${mode === 'text' ? 'button--primary' : 'button--ghost'}`}
-            onClick={() => onModeChange('text')}
-          >
-            纯文生图
-          </button>
-          <button
-            type="button"
-            className={`button ${mode === 'reference' ? 'button--primary' : 'button--ghost'}`}
-            onClick={() => onModeChange('reference')}
-            disabled={!supportsReferenceImages}
-          >
-            图生图
-          </button>
-        </div>
+        {hasReferenceImage ? <span className="provider-tag">参考图请求</span> : null}
+      </div>
+
+      <div className="button-row composer-mode-row">
+        <button
+          type="button"
+          className={`button ${mode === 'text' ? 'button--primary' : 'button--ghost'}`}
+          onClick={() => onModeChange('text')}
+        >
+          纯文生图
+        </button>
+        <button
+          type="button"
+          className={`button ${mode === 'reference' ? 'button--primary' : 'button--ghost'}`}
+          onClick={() => onModeChange('reference')}
+          disabled={!supportsReferenceImages}
+        >
+          图生图
+        </button>
       </div>
 
       {supportsReferenceImages ? (
@@ -50,7 +54,7 @@ export function ReferenceImageDropzone({
               <img src={previewUrl} alt="参考图预览" />
               <div>
                 <strong>{fileName || '已载入参考图'}</strong>
-                <p>下次图生图会把这张图片一起发送给 provider。</p>
+                <p>这张图片会随下一次图生图请求发送。</p>
                 <div className="button-row">
                   <label className="button button--ghost">
                     替换图片
@@ -77,8 +81,8 @@ export function ReferenceImageDropzone({
                 hidden
                 onChange={(event) => onSelectFile(event.target.files?.[0] ?? null)}
               />
-              <strong>选择图片</strong>
-              <span>支持本地上传，也可以从结果或历史直接复用。</span>
+              <strong>选择参考图</strong>
+              <span>也可以从结果或历史直接复用。</span>
             </label>
           )}
         </div>

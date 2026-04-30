@@ -1,22 +1,24 @@
-import type { PropsWithChildren, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
-interface WorkbenchFrameProps extends PropsWithChildren {
-  sidebar: ReactNode;
-  lowerPanel?: ReactNode;
+interface WorkbenchFrameProps {
+  gallery: ReactNode;
+  composer: ReactNode;
+  rail: ReactNode;
+  support?: ReactNode;
 }
 
 export function WorkbenchFrame({
-  sidebar,
-  lowerPanel,
-  children,
+  gallery,
+  composer,
+  rail,
+  support,
 }: WorkbenchFrameProps) {
   return (
     <div className="workbench-frame">
-      <div className="workbench-frame__main-column">
-        <section className="workbench-frame__hero">{children}</section>
-        {lowerPanel ? <section className="workbench-frame__lower">{lowerPanel}</section> : null}
-      </div>
-      <aside className="workbench-frame__sidebar">{sidebar}</aside>
+      <section className="workbench-frame__gallery">{gallery}</section>
+      <section className="workbench-frame__composer">{composer}</section>
+      <aside className="workbench-frame__rail">{rail}</aside>
+      {support ? <section className="workbench-frame__support">{support}</section> : null}
     </div>
   );
 }

@@ -18,12 +18,14 @@ export function ResultGallery({
   onReusePrompt,
 }: ResultGalleryProps) {
   return (
-    <section>
-      <div className="section-heading">
+    <section className="gallery-stage" aria-labelledby="current-results-heading">
+      <div className="section-heading section-heading--gallery">
         <div>
-          <h3>当前结果</h3>
-          <p>这里展示当前这一轮的最新结果，可直接预览、下载或转成参考图。</p>
+          <p className="section-heading__eyebrow">Inspiration Gallery</p>
+          <h3 id="current-results-heading">当前结果</h3>
+          <p>最新生成会沉到这里，方便你预览、下载、改写提示词或继续作为参考图迭代。</p>
         </div>
+        {results.length ? <span className="surface-header__badge">{results.length} 张图片</span> : null}
       </div>
 
       {results.length ? (
@@ -42,9 +44,9 @@ export function ResultGallery({
         </div>
       ) : (
         <EmptyState
-          eyebrow="当前结果"
-          title="这里会出现你的最新结果"
-          body="先完成连接配置，再输入提示词并提交生成。"
+          eyebrow="等待第一张作品"
+          title="生成结果会成为你的灵感画廊"
+          body="先完成右侧 provider 配置，再在下方写提示词。生成后可以直接预览、下载、复用为参考图或继续改写。"
         />
       )}
     </section>
