@@ -1,23 +1,23 @@
+import type { GenerationMode, ImageReferenceInput } from '../../lib/openai/ai-sdk-image-client';
+
 interface ReferenceImageDropzoneProps {
-  mode: 'text' | 'reference';
-  previewUrl: string;
-  fileName: string;
+  mode: GenerationMode;
+  referenceImages: ImageReferenceInput[];
   supportsReferenceImages: boolean;
-  onModeChange: (mode: 'text' | 'reference') => void;
-  onSelectFile: (file: File | null) => void;
-  onClear: () => void;
+  onModeChange: (mode: GenerationMode) => void;
+  onAddFiles: (files: File[]) => void;
+  onRemove: (previewUrl: string) => void;
 }
 
 export function ReferenceImageDropzone({
   mode,
-  previewUrl,
-  fileName,
+  referenceImages,
   supportsReferenceImages,
   onModeChange,
-  onSelectFile,
-  onClear,
+  onAddFiles,
+  onRemove,
 }: ReferenceImageDropzoneProps) {
-  const hasReferenceImage = mode === 'reference' && Boolean(previewUrl);
+  const hasReferenceImage = mode !== 'text' && referenceImages.length > 0;
 
   return (
     <div className="reference-dropzone-card">
@@ -39,38 +39,47 @@ export function ReferenceImageDropzone({
         </button>
         <button
           type="button"
-          className={`button ${mode === 'reference' ? 'button--primary' : 'button--ghost'}`}
-          onClick={() => onModeChange('reference')}
+          className={`button ${mode === 'image' ? 'button--primary' : 'button--ghost'}`}
+          onClick={() => onModeChange('image')}
           disabled={!supportsReferenceImages}
         >
           图生图
+        </button>
+        <button
+          type="button"
+          className={`button ${mode === 'mask' ? 'button--primary' : 'button--ghost'}`}
+          onClick={() => onModeChange('mask')}
+          disabled={!supportsReferenceImages}
+        >
+          遮罩编辑
         </button>
       </div>
 
       {supportsReferenceImages ? (
         <div className="reference-dropzone">
-          {previewUrl ? (
+          {referenceImages.length ? (
             <div className="reference-dropzone__preview">
-              <img src={previewUrl} alt="参考图预览" />
+              <div className="reference-dropzone__thumb-grid">
+                {referenceImages.map((reference) => (
+                  <span key={reference.previewUrl} className="reference-dropzone__thumb">
+                    <img src={reference.previewUrl} alt="参考图预览" />
+                    <button type="button" onClick={() => onRemove(reference.previewUrl)}>移除</button>
+                  </span>
+                ))}
+              </div>
               <div>
-                <strong>{fileName || '已载入参考图'}</strong>
-                <p>这张图片会随下一次图生图请求发送。</p>
-                <div className="button-row">
-                  <label className="button button--ghost">
-                    替换图片
-                    <input
-                      type="file"
-                      accept="image/*"
-                      hidden
-                      onChange={(event) =>
-                        onSelectFile(event.target.files?.[0] ?? null)
-                      }
-                    />
-                  </label>
-                  <button className="button button--danger" type="button" onClick={onClear}>
-                    清除
-                  </button>
-                </div>
+                <strong>{referenceImages.length} 张参考图</strong>
+                <p>最多 16 张，会随下一次图生图或 mask 请求发送。</p>
+                <label className="button button--ghost">
+                  添加图片
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    hidden
+                    onChange={(event) => onAddFiles(Array.from(event.target.files ?? []))}
+                  />
+                </label>
               </div>
             </div>
           ) : (
@@ -78,8 +87,9 @@ export function ReferenceImageDropzone({
               <input
                 type="file"
                 accept="image/*"
+                multiple
                 hidden
-                onChange={(event) => onSelectFile(event.target.files?.[0] ?? null)}
+                onChange={(event) => onAddFiles(Array.from(event.target.files ?? []))}
               />
               <strong>选择参考图</strong>
               <span>也可以从结果或历史直接复用。</span>
@@ -88,7 +98,7 @@ export function ReferenceImageDropzone({
         </div>
       ) : (
         <p className="field__hint">
-          当前 provider 被标记为不支持参考图，若实际支持可在兼容回退中手动打开。
+          当前 OpenAI 图片模型暂未启用参考图模式。
         </p>
       )}
     </div>

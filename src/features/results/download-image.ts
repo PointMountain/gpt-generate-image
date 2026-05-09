@@ -1,5 +1,8 @@
 import type { ResultImage } from '../history/history-types';
-import { buildResultFileName } from '../../lib/openai/image-request-builder';
+
+function buildResultFileName(image: ResultImage, index: number) {
+  return image.fileName || `generated-image-${index + 1}.${image.extension ?? 'png'}`;
+}
 
 export async function downloadImage(image: ResultImage, index: number) {
   const link = document.createElement('a');

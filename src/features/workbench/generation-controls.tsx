@@ -3,7 +3,12 @@ interface GenerationControlsProps {
   count: number;
   quality: string;
   outputFormat: string;
-  onChange: (field: 'size' | 'count' | 'quality' | 'outputFormat', value: string) => void;
+  background: string;
+  outputCompression: number;
+  onChange: (
+    field: 'size' | 'count' | 'quality' | 'outputFormat' | 'background' | 'outputCompression',
+    value: string,
+  ) => void;
 }
 
 const SIZE_OPTIONS = [
@@ -25,12 +30,19 @@ const FORMAT_OPTIONS = [
   { value: 'jpeg', label: 'JPEG' },
   { value: 'webp', label: 'WEBP' },
 ];
+const BACKGROUND_OPTIONS = [
+  { value: 'auto', label: '自动' },
+  { value: 'transparent', label: '透明' },
+  { value: 'opaque', label: '不透明' },
+];
 
 export function GenerationControls({
   size,
   count,
   quality,
   outputFormat,
+  background,
+  outputCompression,
   onChange,
 }: GenerationControlsProps) {
   return (
@@ -49,7 +61,7 @@ export function GenerationControls({
               </option>
             ))}
           </select>
-          <span className="field__hint">部分 provider 对显式尺寸更敏感，优先使用自动。</span>
+          <span className="field__hint">OpenAI 支持的尺寸会随模型变化，自动值不会随请求发送。</span>
         </div>
         <div className="field">
           <label htmlFor="image-count">张数</label>
@@ -93,7 +105,33 @@ export function GenerationControls({
               </option>
             ))}
           </select>
-          <span className="field__hint">自动格式的兼容性通常最好。</span>
+          <span className="field__hint">自动格式不会随请求发送。</span>
+        </div>
+        <div className="field">
+          <label htmlFor="image-background">背景</label>
+          <select
+            id="image-background"
+            value={background}
+            onChange={(event) => onChange('background', event.target.value)}
+          >
+            {BACKGROUND_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="image-compression">压缩</label>
+          <input
+            id="image-compression"
+            type="number"
+            min={0}
+            max={100}
+            value={outputCompression}
+            onChange={(event) => onChange('outputCompression', event.target.value)}
+          />
+          <span className="field__hint">0 表示不发送 output_compression。</span>
         </div>
       </div>
     </div>

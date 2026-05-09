@@ -5,14 +5,14 @@ import type { HistoryEntry } from './history-types';
 
 const entry: HistoryEntry = {
   id: 'history-1',
-  providerId: 'provider-1',
-  providerLabel: 'OpenAI Official',
   modelId: 'gpt-image-1',
   prompt: '海边温室，电影灯光',
-  negativePrompt: '',
   size: '1024x1024',
   count: 1,
   quality: 'high',
+  outputFormat: 'png',
+  background: 'auto',
+  outputCompression: 0,
   mode: 'text',
   images: [
     { id: 'image-1', src: 'data:image/png;base64,a', source: 'base64' },
@@ -35,7 +35,7 @@ describe('history-panel', () => {
 
     expect(screen.getByText('Recent Inspiration')).toBeInTheDocument();
     expect(screen.getByText('1 条记录')).toBeInTheDocument();
-    expect(screen.getByText('gpt-image-1 · 1024x1024')).toBeInTheDocument();
+    expect(screen.getByText('文生图 · 1024x1024')).toBeInTheDocument();
     expect(screen.getByText('+1')).toBeInTheDocument();
   });
 

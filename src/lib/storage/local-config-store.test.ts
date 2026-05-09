@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createEmptyProviderDraft, createProviderStoreState } from '../../features/providers/provider-store';
 import {
   clearLocalConfigStore,
-  loadProviderStore,
-  saveProviderStore,
+  loadPresetsFromStorage,
+  savePresetsToStorage,
 } from './local-config-store';
 
 describe('local-config-store', () => {
@@ -11,25 +10,17 @@ describe('local-config-store', () => {
     clearLocalConfigStore();
   });
 
-  it('persists and reloads provider state', () => {
-    const provider = createEmptyProviderDraft({
-      name: 'Saved provider',
-      baseUrl: 'https://example.com/v1',
-      apiKey: 'key',
-    });
-    const state = createProviderStoreState({
-      providers: [provider],
-      activeProviderId: provider.id,
-    });
+  it('persists and reloads presets', () => {
+    const presets = [{ id: 'preset-1', prompt: 'warm portrait' }];
 
-    saveProviderStore(state);
+    savePresetsToStorage(presets);
 
-    expect(loadProviderStore()).toEqual(state);
+    expect(loadPresetsFromStorage()).toEqual(presets);
   });
 
-  it('returns undefined when storage is corrupted', () => {
-    window.localStorage.setItem('gpt-image-workbench/providers', '{oops');
+  it('returns an empty list when storage is corrupted', () => {
+    window.localStorage.setItem('gpt-image-workbench/presets', '{oops');
 
-    expect(loadProviderStore()).toBeUndefined();
+    expect(loadPresetsFromStorage()).toEqual([]);
   });
 });

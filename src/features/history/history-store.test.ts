@@ -5,14 +5,14 @@ import type { HistoryEntry } from './history-types';
 function createEntry(id: string, createdAt: string): HistoryEntry {
   return {
     id,
-    providerId: null,
-    providerLabel: 'provider',
     modelId: 'gpt-image-1',
     prompt: 'prompt',
-    negativePrompt: '',
     size: '1024x1024',
     count: 1,
     quality: 'high',
+    outputFormat: 'png',
+    background: 'auto',
+    outputCompression: 0,
     mode: 'text',
     images: [],
     createdAt,

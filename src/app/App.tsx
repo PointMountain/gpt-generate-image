@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppShell } from '../components/layout/app-shell';
 import { WorkbenchFrame } from '../components/layout/workbench-frame';
 import { ToastRegion } from '../components/feedback/toast-region';
@@ -10,44 +10,36 @@ import { downloadImage } from '../features/results/download-image';
 import {
   GenerationForm,
   createDefaultGenerationFormState,
-  isPristineGenerationForm,
   type GenerationFormState,
 } from '../features/workbench/generation-form';
-import { ProviderSettingsPanel } from '../features/providers/provider-settings-panel';
-import {
-  createEmptyProviderDraft,
-  createProviderStoreState,
-  duplicateProvider,
-  getActiveProvider,
-  removeProvider,
-  setActiveProvider,
-  upsertProvider,
-} from '../features/providers/provider-store';
-import type {
-  DiscoveryState,
-  ProviderConfig,
-  ProviderStoreState,
-  ProviderValidationErrors,
-} from '../features/providers/provider-types';
-import { validateProviderDraft } from '../lib/validation/provider-validation';
-import { clearLocalConfigStore, loadProviderStore, saveProviderStore } from '../lib/storage/local-config-store';
-import { generateImages, runModelDiscovery } from '../lib/openai/openai-compatible-client';
-import { getBestDefaultModel, getProviderCapabilities } from '../lib/openai/provider-capabilities';
-import { applyProfileDefaultsToProvider, resolveProviderProfile } from '../lib/openai/provider-profile';
+import { OpenAISettingsPanel } from '../features/settings/openai-settings-panel';
 import type { HistoryEntry, PresetRecord, ResultImage } from '../features/history/history-types';
 import { HistoryPanel } from '../features/history/history-panel';
 import { PresetPanel } from '../features/presets/preset-panel';
-import { createPreset, loadPresets, removePreset, savePresets, upsertPreset } from '../features/presets/preset-store';
+import {
+  createPreset,
+  loadPresets,
+  normalizePresetRecord,
+  removePreset,
+  savePresets,
+  upsertPreset,
+} from '../features/presets/preset-store';
 import { deleteHistoryEntry, listHistoryEntries, putHistoryEntry } from '../lib/storage/indexeddb-history-store';
 import { prependHistoryEntry } from '../features/history/history-store';
+import {
+  generateOpenAIImages,
+  type ImageReferenceInput,
+  type OpenAIImageSettings,
+} from '../lib/openai/ai-sdk-image-client';
+import {
+  loadOpenAISettings,
+  saveOpenAISettings,
+  validateOpenAISettings,
+  type OpenAISettingsStoreState,
+  type OpenAISettingsValidationErrors,
+} from '../lib/openai/openai-settings-store';
 
-function createDiscoveryState(): DiscoveryState {
-  return {
-    status: 'idle',
-    models: [],
-    likelyModelIds: [],
-  };
-}
+const MAX_REFERENCE_IMAGES = 16;
 
 function createHistoryId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -66,40 +58,56 @@ async function convertImageToFile(image: ResultImage, suggestedName = 'reference
   });
 }
 
+function formFromSettings(settings: OpenAISettingsStoreState) {
+  return createDefaultGenerationFormState({
+    size: settings.defaultSize,
+    quality: settings.defaultQuality,
+    outputFormat: settings.defaultOutputFormat,
+    background: settings.defaultBackground,
+    outputCompression: settings.defaultOutputCompression,
+  });
+}
+
 function createHistoryEntry(
-  provider: ProviderConfig,
-  selectedModelId: string,
+  settings: OpenAIImageSettings,
   form: GenerationFormState,
   images: ResultImage[],
 ): HistoryEntry {
   return {
     id: createHistoryId(),
-    providerId: provider.id,
-    providerLabel: provider.name,
-    modelId: selectedModelId,
+    modelId: settings.model,
     prompt: form.prompt,
-    negativePrompt: form.negativePrompt,
     size: form.size,
     count: form.count,
     quality: form.quality,
+    outputFormat: form.outputFormat,
+    background: form.background,
+    outputCompression: form.outputCompression,
     mode: form.mode,
-    referencePreviewUrl: form.referencePreviewUrl || undefined,
+    referencePreviewUrls: form.referenceImages.map((reference) => reference.previewUrl),
+    maskPreviewUrl: form.maskPreviewUrl || undefined,
     images,
     createdAt: new Date().toISOString(),
   };
 }
 
-export function App() {
-  const [providerState, setProviderState] = useState<ProviderStoreState>(() =>
-    createProviderStoreState(loadProviderStore()),
-  );
-  const [providerDraft, setProviderDraft] = useState<ProviderConfig>(() => {
-    const storedState = createProviderStoreState(loadProviderStore());
-    return getActiveProvider(storedState) ?? createEmptyProviderDraft();
+function revokeReferenceImages(references: ImageReferenceInput[]) {
+  references.forEach((reference) => {
+    if (reference.previewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(reference.previewUrl);
+    }
   });
-  const [providerErrors, setProviderErrors] = useState<ProviderValidationErrors>({});
-  const [discoveryState, setDiscoveryState] = useState<DiscoveryState>(createDiscoveryState);
-  const [form, setForm] = useState<GenerationFormState>(createDefaultGenerationFormState);
+}
+
+export function App() {
+  const initialSettingsRef = useRef<OpenAISettingsStoreState | null>(null);
+  if (!initialSettingsRef.current) {
+    initialSettingsRef.current = loadOpenAISettings();
+  }
+
+  const [settings, setSettings] = useState<OpenAISettingsStoreState>(() => initialSettingsRef.current!);
+  const [settingsErrors, setSettingsErrors] = useState<OpenAISettingsValidationErrors>({});
+  const [form, setForm] = useState<GenerationFormState>(() => formFromSettings(initialSettingsRef.current!));
   const [results, setResults] = useState<ResultImage[]>([]);
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
   const [presets, setPresets] = useState<PresetRecord[]>(() => loadPresets());
@@ -112,24 +120,13 @@ export function App() {
   } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<ResultImage | null>(null);
-  const autoAppliedProfileRef = useRef<string>('');
-
-  const selectedModelId = useMemo(
-    () => getBestDefaultModel(providerDraft, discoveryState),
-    [providerDraft, discoveryState],
-  );
-  const capabilities = useMemo(
-    () => getProviderCapabilities(providerDraft, discoveryState),
-    [providerDraft, discoveryState],
-  );
-  const providerProfile = useMemo(
-    () => resolveProviderProfile(providerDraft),
-    [providerDraft.baseUrl],
-  );
+  const generationAbortRef = useRef<AbortController | null>(null);
+  const generationIdRef = useRef(0);
+  const latestFormRef = useRef(form);
 
   useEffect(() => {
-    saveProviderStore(providerState);
-  }, [providerState]);
+    latestFormRef.current = form;
+  }, [form]);
 
   useEffect(() => {
     savePresets(presets);
@@ -162,275 +159,240 @@ export function App() {
 
   useEffect(() => {
     return () => {
-      if (form.referencePreviewUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(form.referencePreviewUrl);
+      const latestForm = latestFormRef.current;
+      revokeReferenceImages(latestForm.referenceImages);
+      if (latestForm.maskPreviewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(latestForm.maskPreviewUrl);
       }
+      generationAbortRef.current?.abort();
     };
-  }, [form.referencePreviewUrl]);
+  }, []);
 
-  useEffect(() => {
-    const autoApplyKey = `${providerDraft.id}:${providerDraft.baseUrl}:${providerProfile.id}`;
-
-    if (providerProfile.id === 'default' || autoAppliedProfileRef.current === autoApplyKey) {
-      return;
-    }
-
-    autoAppliedProfileRef.current = autoApplyKey;
-    setProviderDraft((previous) => applyProfileDefaultsToProvider(previous, providerProfile));
-    setForm((previous) =>
-      isPristineGenerationForm(previous)
-        ? {
-            ...previous,
-            ...providerProfile.recommendedSettings,
-          }
-        : previous,
-    );
-    setToastMessage(`${providerProfile.label} 已套用推荐参数。`);
-  }, [providerDraft.id, providerDraft.baseUrl, providerProfile]);
-
-  function applyProviderProfileDefaults() {
-    setProviderDraft((previous) => applyProfileDefaultsToProvider(previous, providerProfile));
-    setForm((previous) => ({
-      ...previous,
-      ...providerProfile.recommendedSettings,
-    }));
-    setToastMessage(`${providerProfile.label} 推荐参数已应用。`);
-  }
-
-  async function discoverModelsForDraft() {
-    const errors = validateProviderDraft(providerDraft);
-    setProviderErrors(errors);
+  function handleSaveSettings() {
+    const errors = validateOpenAISettings(settings);
+    setSettingsErrors(errors);
 
     if (Object.keys(errors).length > 0) {
-      setToastMessage('先补全 provider 的基础字段，再测试连接。');
+      setToastMessage('请先补全 OpenAI 设置。');
       return;
     }
 
-    if (providerDraft.fallback.skipDiscovery) {
-      setDiscoveryState({
-        status: 'success',
-        models: [],
-        likelyModelIds: [],
-        message: '已启用跳过模型发现，请直接手填模型。',
-      });
+    saveOpenAISettings(settings);
+    setToastMessage('OpenAI 设置已保存到当前浏览器。');
+  }
+
+  function addReferenceFiles(files: File[]) {
+    if (!files.length) {
       return;
     }
 
-    setDiscoveryState({
-      status: 'loading',
-      models: [],
-      likelyModelIds: [],
-      message: '正在拉取模型列表…',
-    });
-
-    const result = await runModelDiscovery(providerDraft);
-    setDiscoveryState(result);
-
-    if (result.status === 'error') {
-      setToastMessage('标准探测失败，可以直接展开兼容回退继续。');
-    } else {
-      setToastMessage(result.message ?? '模型已刷新。');
-    }
-  }
-
-  function handleSaveProvider() {
-    const errors = validateProviderDraft(providerDraft);
-    setProviderErrors(errors);
-
-    if (Object.keys(errors).length > 0) {
-      setToastMessage('provider 还有未完成项，暂时无法保存。');
-      return;
-    }
-
-    const nextState = upsertProvider(providerState, providerDraft);
-    setProviderState(nextState);
-    setToastMessage('provider 已保存到当前浏览器。');
-  }
-
-  function syncDraftWithActive(nextState: ProviderStoreState) {
-    const nextActiveProvider = getActiveProvider(nextState);
-    setProviderDraft(nextActiveProvider ?? createEmptyProviderDraft());
-  }
-
-  function handleSelectProvider(providerId: string) {
-    const nextState = setActiveProvider(providerState, providerId);
-    setProviderState(nextState);
-    syncDraftWithActive(nextState);
-    setGenerationError(null);
-  }
-
-  function handleDeleteProvider(providerId: string) {
-    const nextState = removeProvider(providerState, providerId);
-    setProviderState(nextState);
-    syncDraftWithActive(nextState);
-    if (!nextState.providers.length) {
-      clearLocalConfigStore();
-      setDiscoveryState(createDiscoveryState());
-    }
-  }
-
-  function handleCreateNewProvider() {
-    setProviderDraft(
-      createEmptyProviderDraft({
-        name: `Provider ${providerState.providers.length + 1}`,
-      }),
-    );
-    setProviderErrors({});
-    setDiscoveryState(createDiscoveryState());
-  }
-
-  function handleDuplicateProvider(provider: ProviderConfig) {
-    setProviderDraft(duplicateProvider(provider));
-    setProviderErrors({});
-    setDiscoveryState(createDiscoveryState());
-  }
-
-  function setReferenceFile(file: File | null) {
     setForm((previous) => {
-      if (previous.referencePreviewUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(previous.referencePreviewUrl);
+      const availableSlots = MAX_REFERENCE_IMAGES - previous.referenceImages.length;
+      const acceptedFiles = files.slice(0, Math.max(availableSlots, 0));
+      const nextReferences = acceptedFiles.map((file) => ({
+        file,
+        previewUrl: URL.createObjectURL(file),
+      }));
+
+      if (files.length > acceptedFiles.length) {
+        setToastMessage(`最多只能附加 ${MAX_REFERENCE_IMAGES} 张参考图。`);
+      }
+
+      return {
+        ...previous,
+        mode: previous.mode === 'text' ? 'image' : previous.mode,
+        referenceImages: [...previous.referenceImages, ...nextReferences],
+      };
+    });
+  }
+
+  function removeReferenceImage(previewUrl: string) {
+    setForm((previous) => {
+      const removed = previous.referenceImages.find((reference) => reference.previewUrl === previewUrl);
+      if (removed?.previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(removed.previewUrl);
+      }
+
+      return {
+        ...previous,
+        referenceImages: previous.referenceImages.filter((reference) => reference.previewUrl !== previewUrl),
+      };
+    });
+  }
+
+  function setMaskFile(file: File | null) {
+    setForm((previous) => {
+      if (previous.maskPreviewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previous.maskPreviewUrl);
       }
 
       if (!file) {
         return {
           ...previous,
-          referenceFile: null,
-          referencePreviewUrl: '',
+          maskFile: null,
+          maskPreviewUrl: '',
         };
       }
 
       return {
         ...previous,
-        referenceFile: file,
-        referencePreviewUrl: URL.createObjectURL(file),
+        mode: 'mask',
+        maskFile: file,
+        maskPreviewUrl: URL.createObjectURL(file),
       };
     });
   }
 
   function clearForm() {
-    setReferenceFile(null);
-    setForm(createDefaultGenerationFormState(providerProfile.recommendedSettings));
+    revokeReferenceImages(form.referenceImages);
+    if (form.maskPreviewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(form.maskPreviewUrl);
+    }
+    setForm(formFromSettings(settings));
     setGenerationError(null);
   }
 
-  async function runGeneration(
-    provider: ProviderConfig,
-    selectedModel: string,
-    nextForm: GenerationFormState,
-  ) {
+  function validateGenerationForm(nextForm: GenerationFormState) {
+    if (!settings.apiKey.trim()) {
+      return '请先填写并保存 OpenAI API key。';
+    }
+
+    if (!settings.model.trim()) {
+      return '请先填写 OpenAI 图片模型。';
+    }
+
+    if (!nextForm.prompt.trim()) {
+      return '提示词还没写。';
+    }
+
+    if (nextForm.mode === 'image' && nextForm.referenceImages.length === 0) {
+      return '图生图模式下至少需要一张参考图。';
+    }
+
+    if (nextForm.mode === 'mask' && nextForm.referenceImages.length === 0) {
+      return '遮罩编辑需要至少一张源图。';
+    }
+
+    if (nextForm.mode === 'mask' && !nextForm.maskFile) {
+      return '遮罩编辑需要上传 mask 文件。';
+    }
+
+    return '';
+  }
+
+  async function runGeneration(nextForm: GenerationFormState) {
+    if (generationAbortRef.current) {
+      setToastMessage('已有生成任务正在进行。');
+      return;
+    }
+
+    const abortController = new AbortController();
+    const generationId = generationIdRef.current + 1;
+    generationIdRef.current = generationId;
+    generationAbortRef.current = abortController;
     setIsGenerating(true);
     setGenerationError(null);
 
-    const result = await generateImages(provider, {
-      prompt: nextForm.prompt,
-      negativePrompt: nextForm.negativePrompt,
-      size: nextForm.size,
-      count: nextForm.count,
-      quality: nextForm.quality,
-      outputFormat: nextForm.outputFormat,
-      mode: nextForm.mode,
-      referenceFile: nextForm.referenceFile,
-      selectedModelId: selectedModel,
-    });
-
-    setIsGenerating(false);
-
-    if (!result.ok) {
-      setGenerationError({
-        message: result.message,
-        detail: result.detail,
-        recommendation: result.recommendation,
+    try {
+      const result = await generateOpenAIImages(settings, nextForm, {
+        abortSignal: abortController.signal,
       });
-      setToastMessage('生成失败，可尝试切换模型或兼容回退。');
-      return;
+
+      if (generationIdRef.current !== generationId) {
+        return;
+      }
+
+      if (!result.ok) {
+        setGenerationError({
+          message: result.message,
+          detail: result.detail,
+          recommendation: result.recommendation,
+        });
+        setToastMessage('生成失败，请检查 OpenAI 设置和本次输入。');
+        return;
+      }
+
+      const nextResults: ResultImage[] = result.images.map((image) => ({
+        id: image.id,
+        src: image.src,
+        source: image.source,
+        mimeType: image.mimeType,
+        fileName: image.fileName,
+        extension: image.extension,
+      }));
+
+      setResults(nextResults);
+
+      const historyEntry = createHistoryEntry(settings, nextForm, nextResults);
+      setHistoryEntries((previous) => prependHistoryEntry(previous, historyEntry));
+      void putHistoryEntry(historyEntry).catch(() => {
+        setToastMessage('图片已生成，但写入历史失败。');
+      });
+
+      setToastMessage(`生成完成，共得到 ${nextResults.length} 张图片。`);
+    } catch (error) {
+      if (generationIdRef.current === generationId) {
+        setGenerationError({
+          message: '生成流程意外中断。',
+          detail: error instanceof Error ? error.message : String(error),
+          recommendation: '请重新尝试；如果反复出现，请检查浏览器控制台或 OpenAI 设置。',
+        });
+        setToastMessage('生成失败，请检查 OpenAI 设置和本次输入。');
+      }
+    } finally {
+      if (generationIdRef.current === generationId) {
+        generationAbortRef.current = null;
+        setIsGenerating(false);
+      }
     }
-
-    const nextResults: ResultImage[] = result.images.map((image) => ({
-      id: image.id,
-      src: image.src,
-      source: image.source,
-      mimeType: image.mimeType,
-      fileName: image.fileName,
-      extension: image.extension,
-    }));
-
-    setResults(nextResults);
-
-    const historyEntry = createHistoryEntry(provider, selectedModel, nextForm, nextResults);
-    setHistoryEntries((previous) => prependHistoryEntry(previous, historyEntry));
-    void putHistoryEntry(historyEntry).catch(() => {
-      setToastMessage('图片已生成，但写入历史失败。');
-    });
-
-    setToastMessage(`生成完成，共得到 ${nextResults.length} 张图片。`);
   }
 
   async function handleGenerate() {
-    const errors = validateProviderDraft(providerDraft);
-    setProviderErrors(errors);
+    const settingsValidationErrors = validateOpenAISettings(settings);
+    setSettingsErrors(settingsValidationErrors);
 
-    if (Object.keys(errors).length > 0) {
-      setToastMessage('请先完成 provider 配置。');
+    if (Object.keys(settingsValidationErrors).length > 0) {
+      setToastMessage('请先完成 OpenAI 设置。');
       return;
     }
 
-    if (!selectedModelId.trim()) {
-      setToastMessage('先选择模型，或在兼容回退中手填模型。');
+    const formError = validateGenerationForm(form);
+    if (formError) {
+      setToastMessage(formError);
       return;
     }
 
-    if (!form.prompt.trim()) {
-      setToastMessage('提示词还没写。');
-      return;
-    }
+    await runGeneration(form);
+  }
 
-    if (form.mode === 'reference' && !capabilities.canUseReferenceImages) {
-      setToastMessage('当前 provider 被标记为不支持参考图。');
-      return;
-    }
-
-    if (form.mode === 'reference' && !form.referenceFile) {
-      setToastMessage('图生图模式下需要一张参考图。');
-      return;
-    }
-
-    await runGeneration(providerDraft, selectedModelId, form);
+  function handleCancelGeneration() {
+    generationAbortRef.current?.abort();
+    generationIdRef.current += 1;
+    generationAbortRef.current = null;
+    setIsGenerating(false);
   }
 
   function applyHistoryEntryToEditor(entry: HistoryEntry) {
     setForm((previous) => ({
       ...previous,
       prompt: entry.prompt,
-      negativePrompt: entry.negativePrompt,
       size: entry.size,
       count: entry.count,
       quality: entry.quality,
-      mode: entry.mode,
-      referenceFile: null,
-      referencePreviewUrl: entry.referencePreviewUrl ?? '',
+      outputFormat: entry.outputFormat,
+      background: entry.background,
+      outputCompression: entry.outputCompression,
+      // 历史里的 preview URL 可能是已失效的 blob URL；只恢复可直接再次发送的纯参数。
+      mode: entry.mode === 'mask' ? 'image' : entry.mode,
+      maskPreviewUrl: '',
+      maskFile: null,
     }));
-
-    if (entry.providerId) {
-      const matchingProvider = providerState.providers.find((provider) => provider.id === entry.providerId);
-      if (matchingProvider) {
-        const nextState = setActiveProvider(providerState, matchingProvider.id);
-        setProviderState(nextState);
-        setProviderDraft({
-          ...matchingProvider,
-          preferredModel: entry.modelId,
-        });
-      }
-    }
   }
 
   async function handleReuseImageAsReference(image: ResultImage) {
     try {
       const file = await convertImageToFile(image);
-      setReferenceFile(file);
-      setForm((previous) => ({
-        ...previous,
-        mode: 'reference',
-      }));
+      addReferenceFiles([file]);
       setToastMessage('结果已装入参考图区。');
     } catch {
       setToastMessage('这张图暂时无法转成参考图。');
@@ -451,14 +413,14 @@ export function App() {
     const preset = createPreset({
       name: presetDraftName.trim() || form.prompt.slice(0, 18),
       prompt: form.prompt,
-      negativePrompt: form.negativePrompt,
       size: form.size,
       count: form.count,
       quality: form.quality,
       outputFormat: form.outputFormat,
+      background: form.background,
+      outputCompression: form.outputCompression,
       mode: form.mode,
-      providerId: providerDraft.id || null,
-      modelId: selectedModelId,
+      modelId: settings.model,
     });
 
     setPresets((previous) => upsertPreset(previous, preset));
@@ -467,44 +429,40 @@ export function App() {
   }
 
   function applyPreset(preset: PresetRecord) {
+    const normalizedPreset = normalizePresetRecord(preset);
+
     setForm((previous) => ({
       ...previous,
-      prompt: preset.prompt,
-      negativePrompt: preset.negativePrompt,
-      size: preset.size,
-      count: preset.count,
-      quality: preset.quality,
-      outputFormat: preset.outputFormat,
-      mode: preset.mode,
+      prompt: normalizedPreset.prompt,
+      size: normalizedPreset.size,
+      count: normalizedPreset.count,
+      quality: normalizedPreset.quality,
+      outputFormat: normalizedPreset.outputFormat,
+      background: normalizedPreset.background,
+      outputCompression: normalizedPreset.outputCompression,
+      mode: normalizedPreset.mode,
     }));
 
-    if (preset.providerId) {
-      const provider = providerState.providers.find((item) => item.id === preset.providerId);
-      if (provider) {
-        const nextState = setActiveProvider(providerState, provider.id);
-        setProviderState(nextState);
-        setProviderDraft({
-          ...provider,
-          preferredModel: preset.modelId,
-        });
-      }
-    }
+    setSettings((previous) => ({
+      ...previous,
+      model: normalizedPreset.modelId || previous.model,
+    }));
   }
 
   const masthead = (
     <>
       <div className="masthead-brand">
-        <p className="masthead-brand__eyebrow">OpenAI-Compatible Image Workbench</p>
+        <p className="masthead-brand__eyebrow">OpenAI Image Workbench</p>
         <h1>AI 出图工作台</h1>
         <p>
-          连接 OpenAI-compatible provider，拉取图片模型，发起生成并沉淀结果、历史和预设。
+          使用 OpenAI 和 AI SDK 生成、编辑并复用图片结果，支持文生图、图生图和 mask 上传。
         </p>
       </div>
 
       <div className="masthead-meta">
-        <span className="pill">{providerState.providers.length} 个 provider</span>
+        <span className="pill">OpenAI</span>
         <span className="pill pill--muted">
-          {selectedModelId ? `模型：${selectedModelId}` : '等待选择模型'}
+          {settings.model ? `模型：${settings.model}` : '等待填写模型'}
         </span>
       </div>
     </>
@@ -524,8 +482,13 @@ export function App() {
         <div className="top-gap">
           <LoadingState
             title="正在生成图片"
-            body="请求已经发出。若当前 provider 较慢，请保持页面开启并等待返回。"
+            body="OpenAI 请求已经发出。可以保持页面开启等待返回，或取消本次请求。"
           />
+          <div className="button-row top-gap">
+            <button className="button button--ghost" type="button" onClick={handleCancelGeneration}>
+              取消生成
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -536,7 +499,7 @@ export function App() {
           {generationError.recommendation ? (
             <p className="field__hint">{generationError.recommendation}</p>
           ) : null}
-          <ErrorDetailDrawer summary="展开 provider 返回详情" detail={generationError.detail} />
+          <ErrorDetailDrawer summary="展开 OpenAI 返回详情" detail={generationError.detail} />
         </div>
       ) : null}
     </>
@@ -545,41 +508,26 @@ export function App() {
   const composer = (
     <GenerationForm
       form={form}
-      selectedModelLabel={selectedModelId}
-      supportsReferenceImages={capabilities.canUseReferenceImages}
-      canGenerate={Boolean(providerDraft.apiKey && providerDraft.baseUrl && form.prompt.trim())}
+      selectedModelLabel={settings.model}
+      supportsReferenceImages
+      canGenerate={Boolean(settings.apiKey && settings.model && form.prompt.trim())}
       isGenerating={isGenerating}
       onChangeForm={setForm}
       onGenerate={() => void handleGenerate()}
       onClear={clearForm}
-      onSelectReferenceFile={setReferenceFile}
+      onAddReferenceFiles={addReferenceFiles}
+      onRemoveReferenceImage={removeReferenceImage}
+      onSelectMaskFile={setMaskFile}
     />
   );
 
   const rail = (
     <>
-      <ProviderSettingsPanel
-        providers={providerState.providers}
-        activeProviderId={providerState.activeProviderId}
-        draft={providerDraft}
-        errors={providerErrors}
-        discoveryState={discoveryState}
-        profile={providerProfile}
-        selectedModelId={selectedModelId}
-        onSelectProvider={handleSelectProvider}
-        onCreateNewProvider={handleCreateNewProvider}
-        onDuplicateProvider={handleDuplicateProvider}
-        onDeleteProvider={handleDeleteProvider}
-        onDraftChange={setProviderDraft}
-        onSaveProvider={handleSaveProvider}
-        onDiscoverModels={() => void discoverModelsForDraft()}
-        onSelectModel={(modelId) =>
-          setProviderDraft((previous) => ({
-            ...previous,
-            preferredModel: modelId,
-          }))
-        }
-        onApplyProfileDefaults={applyProviderProfileDefaults}
+      <OpenAISettingsPanel
+        settings={settings}
+        errors={settingsErrors}
+        onChange={setSettings}
+        onSave={handleSaveSettings}
       />
       <HistoryPanel
         entries={historyEntries}
@@ -602,7 +550,7 @@ export function App() {
   return (
     <AppShell
       masthead={masthead}
-      footer={<p>本地模式。key 仅保存在当前浏览器；若遇到 CORS，可继续使用本地代理或再包装桌面壳。</p>}
+      footer={<p>本地个人工作台。OpenAI API key 仅保存在当前浏览器；公开部署请改用后端代理。</p>}
     >
       <WorkbenchFrame
         gallery={galleryStage}

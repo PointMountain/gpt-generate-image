@@ -46,7 +46,7 @@ export function ResultGallery({
         <EmptyState
           eyebrow="等待第一张作品"
           title="生成结果会成为你的灵感画廊"
-          body="先完成右侧 provider 配置，再在下方写提示词。生成后可以直接预览、下载、复用为参考图或继续改写。"
+          body="先完成右侧 OpenAI 设置，再在下方写提示词。生成后可以直接预览、下载、复用为参考图或继续改写。"
         />
       )}
     </section>

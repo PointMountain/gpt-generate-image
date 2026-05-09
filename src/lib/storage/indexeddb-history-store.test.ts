@@ -9,14 +9,14 @@ import type { HistoryEntry } from '../../features/history/history-types';
 function createHistoryEntry(): HistoryEntry {
   return {
     id: 'history-1',
-    providerId: null,
-    providerLabel: 'Provider',
     modelId: 'gpt-image-1',
     prompt: 'cinematic city',
-    negativePrompt: '',
     size: '1024x1024',
     count: 1,
     quality: 'high',
+    outputFormat: 'png',
+    background: 'auto',
+    outputCompression: 0,
     mode: 'text',
     images: [{ id: 'img-1', src: 'data:image/png;base64,abc', source: 'base64' }],
     createdAt: '2026-04-27T12:00:00.000Z',
