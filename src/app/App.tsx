@@ -452,10 +452,10 @@ export function App() {
   const masthead = (
     <>
       <div className="masthead-brand">
-        <p className="masthead-brand__eyebrow">OpenAI Image Workbench</p>
-        <h1>AI 出图工作台</h1>
+        <p className="masthead-brand__eyebrow">OpenAI 图片创作画布</p>
+        <h1>TokenCanvas</h1>
         <p>
-          使用 OpenAI 和 AI SDK 生成、编辑并复用图片结果，支持文生图、图生图和 mask 上传。
+          使用 OpenAI 和 AI SDK 生成、编辑并复用图片结果，把提示词、参考图和 mask 收进同一张创作画布。
         </p>
       </div>
 
