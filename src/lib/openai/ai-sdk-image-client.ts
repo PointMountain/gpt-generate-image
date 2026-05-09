@@ -5,6 +5,7 @@ import {
   type OpenAIImageModelGenerationOptions,
   type OpenAIProviderSettings,
 } from '@ai-sdk/openai';
+import { resolveOpenAIProviderTransport } from './openai-endpoint';
 import { normalizeGeneratedFiles, type NormalizedImageResult } from './response-normalizer';
 
 export type GenerationMode = 'text' | 'image' | 'mask';
@@ -239,43 +240,26 @@ function redactSensitiveDetail(detail: string) {
     .replace(/(Authorization\s*[:=]\s*)[^\s,}]+/gi, '$1[redacted]');
 }
 
-function isLocalBrowserHost() {
-  if (typeof window === 'undefined') {
-    return false;
-  }
-
-  return ['localhost', '127.0.0.1'].includes(window.location.hostname);
-}
-
-function shouldUseDevProxy(settings: OpenAIImageSettings) {
-  return isLocalBrowserHost() && settings.baseURL.trim() !== '' && settings.baseURL.trim() !== 'https://api.openai.com/v1';
-}
-
-function createDevProxyFetch(baseURL: string): typeof fetch {
-  return (input, init) => {
-    const targetUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-    const proxiedUrl = targetUrl.replace(/^https:\/\/api\.openai\.com\/v1/i, '/api/openai');
-    const headers = new Headers(init?.headers);
-    headers.set('x-openai-base-url', baseURL);
-
-    return fetch(proxiedUrl, {
-      ...init,
-      headers,
-    });
-  };
-}
-
 export async function generateOpenAIImages(
   settings: OpenAIImageSettings,
   input: OpenAIImageGenerationInput,
   options: { abortSignal?: AbortSignal } = {},
   deps: GenerateOpenAIImagesDeps = {},
 ): Promise<ClientResult> {
-  const useDevProxy = shouldUseDevProxy(settings);
+  const transport = resolveOpenAIProviderTransport(settings.baseURL);
+  if (!transport.ok) {
+    return {
+      ok: false,
+      message: 'OpenAI 图片生成请求失败。',
+      detail: transport.message,
+      recommendation: '先修正高级连接设置里的 baseURL，再重新生成。',
+    };
+  }
+
   const openai = (deps.createOpenAIProvider ?? createOpenAI)({
     apiKey: settings.apiKey,
-    baseURL: useDevProxy ? undefined : settings.baseURL.trim() || undefined,
-    fetch: useDevProxy ? createDevProxyFetch(settings.baseURL.trim()) : undefined,
+    baseURL: transport.baseURL,
+    fetch: transport.fetch,
   });
   const runGenerateImage = deps.runGenerateImage ?? generateImage;
   const timeout = createTimeoutController(settings.timeoutSeconds, options.abortSignal);

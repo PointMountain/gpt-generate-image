@@ -85,30 +85,25 @@ export function GenerationForm({
 }: GenerationFormProps) {
   const hasReferenceImage = form.mode !== 'text' && form.referenceImages.length > 0;
   const hasMask = form.mode === 'mask' && Boolean(form.maskPreviewUrl);
+  const modeLabel = form.mode === 'text' ? '文生图' : form.mode === 'image' ? '图生图' : '遮罩编辑';
 
   return (
     <div className="composer-panel">
       <div className="surface-header surface-header--tight">
         <div>
-          <p className="section-heading__eyebrow">Create</p>
+          <p className="section-heading__eyebrow">Create workspace</p>
           <h2>创作下一轮</h2>
-          <p>写提示词，按需要附加参考图或 mask，再用 OpenAI 生成结果。</p>
+          <p>先写提示词，再决定是否附加参考图或 mask，最后生成并把结果带回下一轮。</p>
         </div>
         <div className="composer-panel__badges">
           <span className="surface-header__badge">
-            当前模型：{selectedModelLabel || '未选择'}
+            {selectedModelLabel || '未选择模型'}
           </span>
-          {hasReferenceImage ? <span className="surface-header__badge">{form.referenceImages.length} 张参考图</span> : null}
-          {hasMask ? <span className="surface-header__badge">Mask 已附加</span> : null}
+          <span className="surface-header__badge">{modeLabel}</span>
         </div>
       </div>
 
-      <PromptEditor
-        prompt={form.prompt}
-        onChangePrompt={(value) => onChangeForm({ ...form, prompt: value })}
-      />
-
-      <div className="composer-panel__controls">
+      <div className="composer-flow" aria-label="图片生成操作流">
         <ReferenceImageDropzone
           mode={form.mode}
           referenceImages={form.referenceImages}
@@ -118,36 +113,50 @@ export function GenerationForm({
           onRemove={onRemoveReferenceImage}
         />
 
-        <MaskImageDropzone
-          mode={form.mode}
-          previewUrl={form.maskPreviewUrl}
-          fileName={form.maskFile?.name ?? ''}
-          onSelectFile={onSelectMaskFile}
-          onClear={() => onSelectMaskFile(null)}
+        <PromptEditor
+          prompt={form.prompt}
+          onChangePrompt={(value) => onChangeForm({ ...form, prompt: value })}
         />
 
-        <GenerationControls
-          size={form.size}
-          count={form.count}
-          quality={form.quality}
-          outputFormat={form.outputFormat}
-          background={form.background}
-          outputCompression={form.outputCompression}
-          onChange={(field, value) =>
-            onChangeForm({
-              ...form,
-              [field]: field === 'count' || field === 'outputCompression' ? Number(value) : value,
-            })
-          }
+        {hasReferenceImage || hasMask ? (
+          <div className="asset-summary" aria-live="polite">
+            {hasReferenceImage ? <span>{form.referenceImages.length} 张参考图将随请求发送</span> : null}
+            {hasMask ? <span>mask 文件已附加</span> : null}
+          </div>
+        ) : null}
+
+        <div className="composer-panel__controls">
+          <MaskImageDropzone
+            mode={form.mode}
+            previewUrl={form.maskPreviewUrl}
+            fileName={form.maskFile?.name ?? ''}
+            onSelectFile={onSelectMaskFile}
+            onClear={() => onSelectMaskFile(null)}
+          />
+
+          <GenerationControls
+            size={form.size}
+            count={form.count}
+            quality={form.quality}
+            outputFormat={form.outputFormat}
+            background={form.background}
+            outputCompression={form.outputCompression}
+            onChange={(field, value) =>
+              onChangeForm({
+                ...form,
+                [field]: field === 'count' || field === 'outputCompression' ? Number(value) : value,
+              })
+            }
+          />
+        </div>
+
+        <GenerationActions
+          canGenerate={canGenerate}
+          isGenerating={isGenerating}
+          onGenerate={onGenerate}
+          onClear={onClear}
         />
       </div>
-
-      <GenerationActions
-        canGenerate={canGenerate}
-        isGenerating={isGenerating}
-        onGenerate={onGenerate}
-        onClear={onClear}
-      />
     </div>
   );
 }

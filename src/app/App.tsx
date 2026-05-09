@@ -38,8 +38,20 @@ import {
   type OpenAISettingsStoreState,
   type OpenAISettingsValidationErrors,
 } from '../lib/openai/openai-settings-store';
+import {
+  fetchOpenAIImageModels,
+  type ImageModelCandidate,
+  type ModelDiscoveryFailure,
+} from '../lib/openai/model-discovery';
 
 const MAX_REFERENCE_IMAGES = 16;
+
+type ModelDiscoveryState = {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  models: ImageModelCandidate[];
+  error?: ModelDiscoveryFailure | null;
+  fetchedAt?: string;
+};
 
 function createHistoryId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -107,6 +119,11 @@ export function App() {
 
   const [settings, setSettings] = useState<OpenAISettingsStoreState>(() => initialSettingsRef.current!);
   const [settingsErrors, setSettingsErrors] = useState<OpenAISettingsValidationErrors>({});
+  const [modelDiscovery, setModelDiscovery] = useState<ModelDiscoveryState>({
+    status: 'idle',
+    models: [],
+    error: null,
+  });
   const [form, setForm] = useState<GenerationFormState>(() => formFromSettings(initialSettingsRef.current!));
   const [results, setResults] = useState<ResultImage[]>([]);
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
@@ -122,6 +139,8 @@ export function App() {
   const [previewImage, setPreviewImage] = useState<ResultImage | null>(null);
   const generationAbortRef = useRef<AbortController | null>(null);
   const generationIdRef = useRef(0);
+  const modelDiscoveryAbortRef = useRef<AbortController | null>(null);
+  const modelDiscoveryRequestIdRef = useRef(0);
   const latestFormRef = useRef(form);
 
   useEffect(() => {
@@ -165,6 +184,7 @@ export function App() {
         URL.revokeObjectURL(latestForm.maskPreviewUrl);
       }
       generationAbortRef.current?.abort();
+      modelDiscoveryAbortRef.current?.abort();
     };
   }, []);
 
@@ -179,6 +199,85 @@ export function App() {
 
     saveOpenAISettings(settings);
     setToastMessage('OpenAI 设置已保存到当前浏览器。');
+  }
+
+  async function handleFetchModels() {
+    const validationErrors = validateOpenAISettings(settings);
+    setSettingsErrors(validationErrors);
+
+    if (validationErrors.apiKey || validationErrors.baseURL || validationErrors.timeoutSeconds) {
+      setToastMessage(validationErrors.apiKey || validationErrors.baseURL || validationErrors.timeoutSeconds || '请先修正 OpenAI 设置。');
+      return;
+    }
+
+    modelDiscoveryAbortRef.current?.abort();
+    const controller = new AbortController();
+    modelDiscoveryAbortRef.current = controller;
+    // 模型拉取允许用户在设置变化后立刻重试，因此这里用 requestId 丢弃过期响应。
+    const requestId = ++modelDiscoveryRequestIdRef.current;
+
+    setModelDiscovery((previous) => ({
+      ...previous,
+      status: 'loading',
+      models: [],
+      error: null,
+      fetchedAt: undefined,
+    }));
+
+    const result = await fetchOpenAIImageModels(settings, {
+      abortSignal: controller.signal,
+    });
+    if (requestId !== modelDiscoveryRequestIdRef.current) {
+      return;
+    }
+
+    if (modelDiscoveryAbortRef.current === controller) {
+      modelDiscoveryAbortRef.current = null;
+    }
+
+    if (!result.ok) {
+      setModelDiscovery((previous) => ({
+        ...previous,
+        status: 'error',
+        models: [],
+        error: result,
+        fetchedAt: undefined,
+      }));
+      setToastMessage(result.message);
+      return;
+    }
+
+    setModelDiscovery({
+      status: 'success',
+      models: result.models,
+      fetchedAt: result.fetchedAt,
+      error: null,
+    });
+    setToastMessage(result.models.length ? `已发现 ${result.models.length} 个图片模型。` : '没有发现图片模型，可继续手动填写模型 ID。');
+  }
+
+  function handleSettingsChange(nextSettings: OpenAISettingsStoreState) {
+    const shouldResetModelDiscovery = (
+      settings.apiKey !== nextSettings.apiKey ||
+      settings.baseURL !== nextSettings.baseURL
+    );
+
+    if (shouldResetModelDiscovery) {
+      modelDiscoveryAbortRef.current?.abort();
+      modelDiscoveryAbortRef.current = null;
+      modelDiscoveryRequestIdRef.current += 1;
+    }
+
+    if (shouldResetModelDiscovery) {
+      setModelDiscovery({
+        status: 'idle',
+        models: [],
+        error: null,
+        fetchedAt: undefined,
+      });
+    }
+
+    setSettings(nextSettings);
   }
 
   function addReferenceFiles(files: File[]) {
@@ -452,10 +551,10 @@ export function App() {
   const masthead = (
     <>
       <div className="masthead-brand">
-        <p className="masthead-brand__eyebrow">OpenAI 图片创作画布</p>
+        <p className="masthead-brand__eyebrow">OpenAI image studio</p>
         <h1>TokenCanvas</h1>
         <p>
-          使用 OpenAI 和 AI SDK 生成、编辑并复用图片结果，把提示词、参考图和 mask 收进同一张创作画布。
+          一个本地浏览器里的 OpenAI 图片创作工作台。选择模型、写提示词、附参考图、生成并把结果继续带回下一轮。
         </p>
       </div>
 
@@ -466,6 +565,53 @@ export function App() {
         </span>
       </div>
     </>
+  );
+
+  const commandBar = (
+    <div className="studio-command-bar" aria-label="OpenAI 创作控制条">
+      <div className="studio-command-bar__identity">
+        <span className="studio-command-bar__mark">TC</span>
+        <div>
+          <p>Provider</p>
+          <strong>OpenAI Image API</strong>
+        </div>
+      </div>
+      <div className="studio-command-bar__metrics">
+        <div>
+          <span>模型</span>
+          <strong>{settings.model || '未选择'}</strong>
+        </div>
+        <div>
+          <span>模型列表</span>
+          <strong>
+            {modelDiscovery.status === 'loading'
+              ? '拉取中'
+              : modelDiscovery.status === 'success'
+                ? `${modelDiscovery.models.length} 个候选`
+                : modelDiscovery.status === 'error'
+                  ? '拉取失败'
+                  : '未拉取'}
+          </strong>
+        </div>
+        <div>
+          <span>连接</span>
+          <strong>{settings.apiKey ? `${settings.timeoutSeconds}s timeout` : '等待 API key'}</strong>
+        </div>
+      </div>
+      <div className="studio-command-bar__actions">
+        <button
+          className="button button--ghost"
+          type="button"
+          disabled={!settings.apiKey.trim() || modelDiscovery.status === 'loading'}
+          onClick={() => void handleFetchModels()}
+        >
+          {modelDiscovery.status === 'loading' ? '拉取中' : '拉取模型'}
+        </button>
+        <button className="button button--primary" type="button" onClick={handleSaveSettings}>
+          保存设置
+        </button>
+      </div>
+    </div>
   );
 
   const galleryStage = (
@@ -482,7 +628,7 @@ export function App() {
         <div className="top-gap">
           <LoadingState
             title="正在生成图片"
-            body="OpenAI 请求已经发出。可以保持页面开启等待返回，或取消本次请求。"
+            body="OpenAI 请求已经发出。保持页面开启等待返回，或取消本次请求后继续调整提示词。"
           />
           <div className="button-row top-gap">
             <button className="button button--ghost" type="button" onClick={handleCancelGeneration}>
@@ -526,8 +672,10 @@ export function App() {
       <OpenAISettingsPanel
         settings={settings}
         errors={settingsErrors}
-        onChange={setSettings}
+        modelDiscovery={modelDiscovery}
+        onChange={handleSettingsChange}
         onSave={handleSaveSettings}
+        onFetchModels={() => void handleFetchModels()}
       />
       <HistoryPanel
         entries={historyEntries}
@@ -553,6 +701,7 @@ export function App() {
       footer={<p>本地个人工作台。OpenAI API key 仅保存在当前浏览器；公开部署请改用后端代理。</p>}
     >
       <WorkbenchFrame
+        commandBar={commandBar}
         gallery={galleryStage}
         composer={composer}
         rail={rail}

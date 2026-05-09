@@ -2,24 +2,42 @@ import type {
   OpenAISettingsStoreState,
   OpenAISettingsValidationErrors,
 } from '../../lib/openai/openai-settings-store';
+import type { ImageModelCandidate, ModelDiscoveryFailure } from '../../lib/openai/model-discovery';
+import { DropdownField, type DropdownOption } from '../../components/form/dropdown-field';
+import {
+  BACKGROUND_OPTIONS as OPENAI_BACKGROUND_OPTIONS,
+  FORMAT_OPTIONS as OPENAI_FORMAT_OPTIONS,
+  QUALITY_OPTIONS as OPENAI_QUALITY_OPTIONS,
+  SIZE_OPTIONS as OPENAI_SIZE_OPTIONS,
+} from '../../lib/openai/openai-option-sets';
+import { ModelPicker, type ModelDiscoveryStatus } from './model-picker';
 
 interface OpenAISettingsPanelProps {
   settings: OpenAISettingsStoreState;
   errors: OpenAISettingsValidationErrors;
+  modelDiscovery?: {
+    status: ModelDiscoveryStatus;
+    models: ImageModelCandidate[];
+    error?: ModelDiscoveryFailure | null;
+    fetchedAt?: string;
+  };
   onChange: (nextSettings: OpenAISettingsStoreState) => void;
   onSave: () => void;
+  onFetchModels?: () => void;
 }
 
-const SIZE_OPTIONS = ['auto', '1024x1024', '1536x1024', '1024x1536', '2048x2048'];
-const QUALITY_OPTIONS = ['auto', 'low', 'medium', 'high', 'standard', 'hd'];
-const FORMAT_OPTIONS = ['auto', 'png', 'jpeg', 'webp'];
-const BACKGROUND_OPTIONS = ['auto', 'transparent', 'opaque'];
+const SIZE_OPTIONS: DropdownOption[] = OPENAI_SIZE_OPTIONS;
+const QUALITY_OPTIONS: DropdownOption[] = OPENAI_QUALITY_OPTIONS;
+const FORMAT_OPTIONS: DropdownOption[] = OPENAI_FORMAT_OPTIONS;
+const BACKGROUND_OPTIONS: DropdownOption[] = OPENAI_BACKGROUND_OPTIONS;
 
 export function OpenAISettingsPanel({
   settings,
   errors,
+  modelDiscovery = { status: 'idle', models: [] },
   onChange,
   onSave,
+  onFetchModels = () => undefined,
 }: OpenAISettingsPanelProps) {
   function updateField<K extends keyof OpenAISettingsStoreState>(
     field: K,
@@ -37,9 +55,9 @@ export function OpenAISettingsPanel({
       <div className="surface-header surface-header--tight">
         <div>
           <h2>OpenAI 设置</h2>
-          <p>API key 只保存在当前浏览器，本工作台直接调用 OpenAI 图片模型。</p>
+          <p>保存 API key 和模型后，就可以在创作区直接生成图片。</p>
         </div>
-        <span className="surface-header__badge">Local Only</span>
+        <span className="surface-header__badge">本地浏览器保存</span>
       </div>
 
       {settings.needsReconfiguration ? (
@@ -53,16 +71,16 @@ export function OpenAISettingsPanel({
         <div>
           <p className="section-heading__eyebrow">Connection</p>
           <h3>{settings.model || 'gpt-image-1'}</h3>
-          <p>{settings.apiKey ? 'OpenAI key 已填写。' : '填写 OpenAI API key 后即可生成图片。'}</p>
+          <p>{settings.apiKey ? 'OpenAI key 已填写，可以生成。' : '填写 OpenAI API key 后即可生成图片。'}</p>
         </div>
         <div className="provider-status-card__badges">
           <span className="provider-tag">OpenAI</span>
-          <span className="provider-tag">{settings.timeoutSeconds}s timeout</span>
+          <span className="provider-tag">{settings.timeoutSeconds}s</span>
         </div>
       </div>
 
       <div className="section-card section-card--flat">
-        <div className="field-grid field-grid--two">
+        <div className="field-grid">
           <div className="field">
             <label htmlFor="openai-api-key">OpenAI API key</label>
             <input
@@ -74,73 +92,67 @@ export function OpenAISettingsPanel({
             />
             {errors.apiKey ? <span className="field__error">{errors.apiKey}</span> : null}
           </div>
+        </div>
 
-          <div className="field">
-            <label htmlFor="openai-base-url">baseURL</label>
-            <input
-              id="openai-base-url"
-              value={settings.baseURL}
-              onChange={(event) => updateField('baseURL', event.target.value)}
-              placeholder="https://api.openai.com/v1"
-            />
-            {errors.baseURL ? <span className="field__error">{errors.baseURL}</span> : null}
-            <span className="field__hint">默认使用 OpenAI 官方地址；本地测试可填兼容端点。</span>
-          </div>
+        <ModelPicker
+          value={settings.model}
+          models={modelDiscovery.models}
+          status={modelDiscovery.status}
+          error={modelDiscovery.error}
+          fetchedAt={modelDiscovery.fetchedAt}
+          canFetchModels={Boolean(settings.apiKey.trim())}
+          onFetchModels={onFetchModels}
+          onChange={(modelId) => updateField('model', modelId)}
+          validationError={errors.model}
+        />
 
-          <div className="field">
-            <label htmlFor="openai-model">模型</label>
-            <input
-              id="openai-model"
-              value={settings.model}
-              onChange={(event) => updateField('model', event.target.value)}
-              placeholder="gpt-image-1"
-            />
-            {errors.model ? <span className="field__error">{errors.model}</span> : null}
-          </div>
+        <div className="button-row top-gap">
+          <button className="button button--primary" type="button" onClick={onSave}>
+            保存 OpenAI 设置
+          </button>
+        </div>
+      </div>
 
-          <div className="field">
-            <label htmlFor="openai-default-size">默认尺寸</label>
-            <select
-              id="openai-default-size"
-              value={settings.defaultSize}
-              onChange={(event) => updateField('defaultSize', event.target.value)}
-            >
-              {SIZE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-            </select>
+      <div className="section-card section-card--flat">
+        <div className="list-header list-header--compact">
+          <div>
+            <h3>默认生成参数</h3>
+            <p>新建创作会从这些默认值开始，单次生成仍可在创作区调整。</p>
           </div>
+        </div>
 
-          <div className="field">
-            <label htmlFor="openai-default-quality">默认质量</label>
-            <select
-              id="openai-default-quality"
-              value={settings.defaultQuality}
-              onChange={(event) => updateField('defaultQuality', event.target.value)}
-            >
-              {QUALITY_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-            </select>
-          </div>
+        <div className="field-grid field-grid--two">
+          <DropdownField
+            id="openai-default-size"
+            label="默认尺寸"
+            value={settings.defaultSize}
+            options={SIZE_OPTIONS}
+            onChange={(value) => updateField('defaultSize', value)}
+          />
 
-          <div className="field">
-            <label htmlFor="openai-default-format">默认格式</label>
-            <select
-              id="openai-default-format"
-              value={settings.defaultOutputFormat}
-              onChange={(event) => updateField('defaultOutputFormat', event.target.value)}
-            >
-              {FORMAT_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-            </select>
-          </div>
+          <DropdownField
+            id="openai-default-quality"
+            label="默认质量"
+            value={settings.defaultQuality}
+            options={QUALITY_OPTIONS}
+            onChange={(value) => updateField('defaultQuality', value)}
+          />
 
-          <div className="field">
-            <label htmlFor="openai-default-background">默认背景</label>
-            <select
-              id="openai-default-background"
-              value={settings.defaultBackground}
-              onChange={(event) => updateField('defaultBackground', event.target.value)}
-            >
-              {BACKGROUND_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-            </select>
-          </div>
+          <DropdownField
+            id="openai-default-format"
+            label="默认格式"
+            value={settings.defaultOutputFormat}
+            options={FORMAT_OPTIONS}
+            onChange={(value) => updateField('defaultOutputFormat', value)}
+          />
+
+          <DropdownField
+            id="openai-default-background"
+            label="默认背景"
+            value={settings.defaultBackground}
+            options={BACKGROUND_OPTIONS}
+            onChange={(value) => updateField('defaultBackground', value)}
+          />
 
           <div className="field">
             <label htmlFor="openai-default-compression">默认压缩</label>
@@ -155,6 +167,30 @@ export function OpenAISettingsPanel({
             <span className="field__hint">0 表示不发送 output_compression。</span>
           </div>
 
+        </div>
+      </div>
+
+      <details className="settings-disclosure">
+        <summary>
+          <span>
+            高级连接设置
+            <small>保留给本地调试。正常使用 OpenAI 官方接口时无需修改。</small>
+          </span>
+        </summary>
+
+        <div className="settings-disclosure__content">
+          <div className="field">
+            <label htmlFor="openai-base-url">baseURL</label>
+            <input
+              id="openai-base-url"
+              value={settings.baseURL}
+              onChange={(event) => updateField('baseURL', event.target.value)}
+              placeholder="https://api.openai.com/v1"
+            />
+            {errors.baseURL ? <span className="field__error">{errors.baseURL}</span> : null}
+            <span className="field__hint">默认使用 OpenAI 官方地址；本地测试可填受信任端点。</span>
+          </div>
+
           <div className="field">
             <label htmlFor="openai-timeout">请求超时（秒）</label>
             <input
@@ -167,13 +203,7 @@ export function OpenAISettingsPanel({
             {errors.timeoutSeconds ? <span className="field__error">{errors.timeoutSeconds}</span> : null}
           </div>
         </div>
-
-        <div className="button-row top-gap">
-          <button className="button button--primary" type="button" onClick={onSave}>
-            保存 OpenAI 设置
-          </button>
-        </div>
-      </div>
+      </details>
     </div>
   );
 }

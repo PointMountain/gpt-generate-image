@@ -9,10 +9,14 @@ export function LoadingState({
 }: LoadingStateProps) {
   return (
     <div className="status-block status-block--loading" role="status" aria-live="polite">
-      <span className="status-spinner" aria-hidden="true" />
       <div>
         <h3>{title}</h3>
         <p>{body}</p>
+      </div>
+      <div className="status-skeleton" aria-hidden="true">
+        <span />
+        <span />
+        <span />
       </div>
     </div>
   );

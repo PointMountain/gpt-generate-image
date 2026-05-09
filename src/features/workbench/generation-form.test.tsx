@@ -52,7 +52,8 @@ describe('generation-form', () => {
       />,
     );
 
-    expect(screen.getAllByText('1 张参考图')).toHaveLength(2);
+    expect(screen.getByText('1 张参考图')).toBeInTheDocument();
+    expect(screen.getByText('1 张参考图将随请求发送')).toBeInTheDocument();
     expect(screen.getByText('参考图请求')).toBeInTheDocument();
     expect(screen.getByText('最多 16 张，会随下一次图生图或 mask 请求发送。')).toBeInTheDocument();
   });
@@ -83,5 +84,40 @@ describe('generation-form', () => {
 
     await user.click(screen.getByRole('button', { name: '生成图片' }));
     expect(onGenerate).toHaveBeenCalled();
+  });
+
+  it('updates discrete generation controls through custom dropdowns', async () => {
+    const user = userEvent.setup();
+    const onChangeForm = vi.fn();
+
+    render(
+      <GenerationForm
+        form={createDefaultGenerationFormState()}
+        selectedModelLabel="gpt-image-1"
+        supportsReferenceImages
+        canGenerate
+        isGenerating={false}
+        onChangeForm={onChangeForm}
+        onGenerate={vi.fn()}
+        onClear={vi.fn()}
+        onAddReferenceFiles={vi.fn()}
+        onRemoveReferenceImage={vi.fn()}
+        onSelectMaskFile={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /尺寸/ }));
+    await user.click(screen.getByRole('option', { name: /1536 x 1024/ }));
+
+    expect(onChangeForm).toHaveBeenCalledWith(expect.objectContaining({
+      size: '1536x1024',
+    }));
+
+    await user.click(screen.getByRole('button', { name: /张数/ }));
+    await user.click(screen.getByRole('option', { name: '3 张' }));
+
+    expect(onChangeForm).toHaveBeenCalledWith(expect.objectContaining({
+      count: 3,
+    }));
   });
 });

@@ -1,11 +1,12 @@
 import type { PresetRecord } from '../history/history-types';
 import type { GenerationMode } from '../../lib/openai/ai-sdk-image-client';
+import {
+  BACKGROUND_VALUES,
+  FORMAT_VALUES,
+  QUALITY_VALUES,
+  SIZE_VALUES,
+} from '../../lib/openai/openai-option-sets';
 import { loadPresetsFromStorage, savePresetsToStorage } from '../../lib/storage/local-config-store';
-
-const SIZE_VALUES = new Set(['auto', '1024x1024', '1536x1024', '1024x1536', '2048x2048']);
-const QUALITY_VALUES = new Set(['auto', 'low', 'medium', 'high', 'standard', 'hd']);
-const FORMAT_VALUES = new Set(['auto', 'png', 'jpeg', 'webp']);
-const BACKGROUND_VALUES = new Set(['auto', 'transparent', 'opaque']);
 
 function createId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {

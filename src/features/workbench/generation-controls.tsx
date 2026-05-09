@@ -1,3 +1,11 @@
+import { DropdownField, type DropdownOption } from '../../components/form/dropdown-field';
+import {
+  BACKGROUND_OPTIONS as OPENAI_BACKGROUND_OPTIONS,
+  FORMAT_OPTIONS as OPENAI_FORMAT_OPTIONS,
+  QUALITY_OPTIONS as OPENAI_QUALITY_OPTIONS,
+  SIZE_OPTIONS as OPENAI_SIZE_OPTIONS,
+} from '../../lib/openai/openai-option-sets';
+
 interface GenerationControlsProps {
   size: string;
   count: number;
@@ -11,30 +19,22 @@ interface GenerationControlsProps {
   ) => void;
 }
 
-const SIZE_OPTIONS = [
-  { value: 'auto', label: '自动（推荐）' },
-  { value: '1024x1024', label: '1024 × 1024' },
-  { value: '1536x1024', label: '1536 × 1024' },
-  { value: '1024x1536', label: '1024 × 1536' },
-  { value: '2048x2048', label: '2048 × 2048' },
-];
-const QUALITY_OPTIONS = [
-  { value: 'auto', label: '自动' },
-  { value: 'high', label: '高质量' },
-  { value: 'medium', label: '均衡' },
-  { value: 'low', label: '快速（更稳）' },
-];
-const FORMAT_OPTIONS = [
-  { value: 'auto', label: '自动' },
-  { value: 'png', label: 'PNG' },
-  { value: 'jpeg', label: 'JPEG' },
-  { value: 'webp', label: 'WEBP' },
-];
-const BACKGROUND_OPTIONS = [
-  { value: 'auto', label: '自动' },
-  { value: 'transparent', label: '透明' },
-  { value: 'opaque', label: '不透明' },
-];
+const SIZE_OPTIONS: DropdownOption[] = OPENAI_SIZE_OPTIONS.map((option, index) => (
+  index === 0 ? { ...option, label: '自动（推荐）' } : option
+));
+const QUALITY_OPTIONS: DropdownOption[] = OPENAI_QUALITY_OPTIONS.map((option) => {
+  if (option.value === 'low') {
+    return { ...option, label: '快速（更稳）' };
+  }
+
+  return option;
+});
+const COUNT_OPTIONS: DropdownOption[] = [1, 2, 3, 4].map((count) => ({
+  value: String(count),
+  label: `${count} 张`,
+}));
+const FORMAT_OPTIONS: DropdownOption[] = OPENAI_FORMAT_OPTIONS;
+const BACKGROUND_OPTIONS: DropdownOption[] = OPENAI_BACKGROUND_OPTIONS;
 
 export function GenerationControls({
   size,
@@ -46,81 +46,52 @@ export function GenerationControls({
   onChange,
 }: GenerationControlsProps) {
   return (
-    <div className="section-card section-card--flat">
+    <div className="section-card section-card--flat generation-controls">
+      <div className="list-header list-header--compact">
+        <div>
+          <h3>生成参数</h3>
+          <p>自动值不会随请求发送，模型会按默认策略处理。</p>
+        </div>
+      </div>
       <div className="field-grid field-grid--two">
-        <div className="field">
-          <label htmlFor="image-size">尺寸</label>
-          <select
-            id="image-size"
-            value={size}
-            onChange={(event) => onChange('size', event.target.value)}
-          >
-            {SIZE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <span className="field__hint">OpenAI 支持的尺寸会随模型变化，自动值不会随请求发送。</span>
-        </div>
-        <div className="field">
-          <label htmlFor="image-count">张数</label>
-          <select
-            id="image-count"
-            value={count}
-            onChange={(event) => onChange('count', event.target.value)}
-          >
-            {[1, 2, 3, 4].map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="image-quality">质量</label>
-          <select
-            id="image-quality"
-            value={quality}
-            onChange={(event) => onChange('quality', event.target.value)}
-          >
-            {QUALITY_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <span className="field__hint">如果上游容易超时，先切到快速。</span>
-        </div>
-        <div className="field">
-          <label htmlFor="image-format">输出格式</label>
-          <select
-            id="image-format"
-            value={outputFormat}
-            onChange={(event) => onChange('outputFormat', event.target.value)}
-          >
-            {FORMAT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <span className="field__hint">自动格式不会随请求发送。</span>
-        </div>
-        <div className="field">
-          <label htmlFor="image-background">背景</label>
-          <select
-            id="image-background"
-            value={background}
-            onChange={(event) => onChange('background', event.target.value)}
-          >
-            {BACKGROUND_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <DropdownField
+          id="image-size"
+          label="尺寸"
+          value={size}
+          options={SIZE_OPTIONS}
+          onChange={(value) => onChange('size', value)}
+          hint="不同模型支持的尺寸会变化。"
+        />
+        <DropdownField
+          id="image-count"
+          label="张数"
+          value={String(count)}
+          options={COUNT_OPTIONS}
+          onChange={(value) => onChange('count', value)}
+        />
+        <DropdownField
+          id="image-quality"
+          label="质量"
+          value={quality}
+          options={QUALITY_OPTIONS}
+          onChange={(value) => onChange('quality', value)}
+          hint="请求不稳时先切到快速。"
+        />
+        <DropdownField
+          id="image-format"
+          label="输出格式"
+          value={outputFormat}
+          options={FORMAT_OPTIONS}
+          onChange={(value) => onChange('outputFormat', value)}
+          hint="自动格式不会随请求发送。"
+        />
+        <DropdownField
+          id="image-background"
+          label="背景"
+          value={background}
+          options={BACKGROUND_OPTIONS}
+          onChange={(value) => onChange('background', value)}
+        />
         <div className="field">
           <label htmlFor="image-compression">压缩</label>
           <input

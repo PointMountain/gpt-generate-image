@@ -23,8 +23,8 @@ export function ReferenceImageDropzone({
     <div className="reference-dropzone-card">
       <div className="list-header list-header--compact">
         <div>
-          <h3>模式</h3>
-          <p>{hasReferenceImage ? '下次生成会带上参考图。' : '文生图优先，必要时附加参考图。'}</p>
+          <h3>生成模式</h3>
+          <p>{hasReferenceImage ? '参考图已经进入下一次请求。' : '从文字开始，或切到图生图继续迭代。'}</p>
         </div>
         {hasReferenceImage ? <span className="provider-tag">参考图请求</span> : null}
       </div>
@@ -32,14 +32,14 @@ export function ReferenceImageDropzone({
       <div className="button-row composer-mode-row">
         <button
           type="button"
-          className={`button ${mode === 'text' ? 'button--primary' : 'button--ghost'}`}
+          className={`button mode-button ${mode === 'text' ? 'button--primary' : 'button--ghost'}`}
           onClick={() => onModeChange('text')}
         >
           纯文生图
         </button>
         <button
           type="button"
-          className={`button ${mode === 'image' ? 'button--primary' : 'button--ghost'}`}
+          className={`button mode-button ${mode === 'image' ? 'button--primary' : 'button--ghost'}`}
           onClick={() => onModeChange('image')}
           disabled={!supportsReferenceImages}
         >
@@ -47,7 +47,7 @@ export function ReferenceImageDropzone({
         </button>
         <button
           type="button"
-          className={`button ${mode === 'mask' ? 'button--primary' : 'button--ghost'}`}
+          className={`button mode-button ${mode === 'mask' ? 'button--primary' : 'button--ghost'}`}
           onClick={() => onModeChange('mask')}
           disabled={!supportsReferenceImages}
         >
@@ -92,7 +92,7 @@ export function ReferenceImageDropzone({
                 onChange={(event) => onAddFiles(Array.from(event.target.files ?? []))}
               />
               <strong>选择参考图</strong>
-              <span>也可以从结果或历史直接复用。</span>
+              <span>也可以从结果或历史直接设为参考图。</span>
             </label>
           )}
         </div>

@@ -12,14 +12,14 @@ export function GenerationActions({
   onClear,
 }: GenerationActionsProps) {
   return (
-    <div className="button-row">
+    <div className="generation-actions">
       <button
-        className="button button--primary"
+        className="button button--primary generation-actions__primary"
         type="button"
         onClick={onGenerate}
         disabled={!canGenerate || isGenerating}
       >
-        {isGenerating ? '生成中…' : '生成图片'}
+        {isGenerating ? '生成中' : '生成图片'}
       </button>
       <button className="button button--ghost" type="button" onClick={onClear}>
         清空输入
