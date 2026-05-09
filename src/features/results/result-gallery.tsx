@@ -21,9 +21,9 @@ export function ResultGallery({
     <section className="gallery-stage" aria-labelledby="current-results-heading">
       <div className="section-heading section-heading--gallery">
         <div>
-          <p className="section-heading__eyebrow">Inspiration Gallery</p>
+          <p className="section-heading__eyebrow">Result loop</p>
           <h3 id="current-results-heading">当前结果</h3>
-          <p>最新生成会沉到这里，方便你预览、下载、改写提示词或继续作为参考图迭代。</p>
+          <p>每张图都能直接预览、下载、设为参考图，或把提示词带回下一轮。</p>
         </div>
         {results.length ? <span className="surface-header__badge">{results.length} 张图片</span> : null}
       </div>
@@ -45,8 +45,8 @@ export function ResultGallery({
       ) : (
         <EmptyState
           eyebrow="等待第一张作品"
-          title="生成结果会成为你的灵感画廊"
-          body="先完成右侧 OpenAI 设置，再在下方写提示词。生成后可以直接预览、下载、复用为参考图或继续改写。"
+          title="先在左侧完成第一轮生成"
+          body="保存 OpenAI 设置，写一段提示词，然后生成。结果会出现在这里，并能直接进入下一轮参考图流程。"
         />
       )}
     </section>

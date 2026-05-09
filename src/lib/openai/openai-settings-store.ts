@@ -1,11 +1,14 @@
 import type { OpenAIImageSettings } from './ai-sdk-image-client';
+import {
+  BACKGROUND_VALUES,
+  FORMAT_VALUES,
+  QUALITY_VALUES,
+  SIZE_VALUES,
+} from './openai-option-sets';
+import { validateOpenAIBaseURL } from './openai-endpoint';
 
 const OPENAI_SETTINGS_KEY = 'gpt-image-workbench/openai-settings';
 const LEGACY_PROVIDERS_KEY = 'gpt-image-workbench/providers';
-const SIZE_VALUES = new Set(['auto', '1024x1024', '1536x1024', '1024x1536', '2048x2048']);
-const QUALITY_VALUES = new Set(['auto', 'low', 'medium', 'high', 'standard', 'hd']);
-const FORMAT_VALUES = new Set(['auto', 'png', 'jpeg', 'webp']);
-const BACKGROUND_VALUES = new Set(['auto', 'transparent', 'opaque']);
 
 export interface OpenAISettingsStoreState extends OpenAIImageSettings {
   needsReconfiguration: boolean;
@@ -118,8 +121,9 @@ export function validateOpenAISettings(settings: OpenAISettingsStoreState) {
     errors.model = '模型不能为空，默认可使用 gpt-image-1 或兼容端点支持的 gpt-image-2。';
   }
 
-  if (settings.baseURL.trim() && !/^https:\/\//i.test(settings.baseURL.trim())) {
-    errors.baseURL = 'baseURL 需要以 https:// 开头。';
+  const baseURLValidation = validateOpenAIBaseURL(settings.baseURL);
+  if (!baseURLValidation.ok) {
+    errors.baseURL = baseURLValidation.message;
   }
 
   if (!Number.isFinite(settings.timeoutSeconds) || settings.timeoutSeconds < 5) {

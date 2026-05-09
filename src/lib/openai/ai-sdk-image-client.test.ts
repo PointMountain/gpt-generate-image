@@ -233,6 +233,26 @@ describe('ai-sdk-image-client', () => {
     expect(proxiedHeaders.get('x-openai-base-url')).toBe('https://example.com/v1');
   });
 
+  it('fails fast when baseURL is not a valid HTTPS endpoint', async () => {
+    const createOpenAIProvider = vi.fn();
+
+    const result = await generateOpenAIImages(
+      createSettings({ baseURL: 'http://example.com/v1' }),
+      createInput(),
+      {},
+      {
+        createOpenAIProvider,
+        runGenerateImage: vi.fn(),
+      },
+    );
+
+    expect(createOpenAIProvider).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      ok: false,
+      detail: 'baseURL 需要以 https:// 开头。',
+    });
+  });
+
   it('rejects oversized reference images before reading them into memory', async () => {
     const file = new File(['small'], 'large.png', { type: 'image/png' });
     Object.defineProperty(file, 'size', { value: 11 * 1024 * 1024 });

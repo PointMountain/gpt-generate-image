@@ -16,6 +16,7 @@ describe('openai-settings-panel', () => {
 
     expect(screen.getByRole('heading', { name: 'OpenAI 设置' })).toBeInTheDocument();
     expect(screen.getByLabelText('OpenAI API key')).toBeInTheDocument();
+    expect(screen.getByText('高级连接设置')).toBeInTheDocument();
     expect(screen.queryByText('Provider 配置与兼容回退')).not.toBeInTheDocument();
   });
 

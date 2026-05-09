@@ -87,4 +87,13 @@ describe('openai-settings-store', () => {
       timeoutSeconds: '超时时间至少为 5 秒。',
     });
   });
+
+  it('rejects malformed https baseURL values', () => {
+    expect(validateOpenAISettings(createDefaultOpenAISettings({
+      apiKey: 'sk-test',
+      baseURL: 'https://',
+    }))).toMatchObject({
+      baseURL: 'baseURL 需要填写有效的 https:// 地址。',
+    });
+  });
 });

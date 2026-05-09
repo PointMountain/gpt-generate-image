@@ -68,6 +68,6 @@ describe('result-gallery', () => {
     );
 
     expect(screen.getByText('等待第一张作品')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '生成结果会成为你的灵感画廊' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '先在左侧完成第一轮生成' })).toBeInTheDocument();
   });
 });
