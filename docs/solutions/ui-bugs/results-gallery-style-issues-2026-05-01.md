@@ -121,5 +121,5 @@ tags: [results-first, workbench, ui, css, design-tokens, focus-visible, mobile, 
 
 ## Related Issues
 
-- Related doc: `docs/solutions/integration-issues/hc0-openai-compatible-image-generation-compatibility-2026-04-27.md`（低重叠，属邻近背景）
+- Related doc: `docs/solutions/integration-issues/openai-compatible-provider-image-generation-compatibility-2026-04-27.md`（低重叠，属邻近背景）
 - GitHub issues: 本次未检索到（`gh` 检索在当前环境未完成授权）

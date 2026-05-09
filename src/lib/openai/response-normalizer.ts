@@ -1,4 +1,4 @@
-import type { ResponseMode } from '../../features/providers/provider-types';
+import type { GeneratedFile } from 'ai';
 
 export interface NormalizedImageResult {
   id: string;
@@ -21,6 +21,20 @@ function toDataUrl(base64: string, mimeType?: string) {
   return `data:${mimeType ?? 'image/png'};base64,${base64}`;
 }
 
+function extensionFromMimeType(mimeType?: string) {
+  return mimeType?.split('/')[1];
+}
+
+export function normalizeGeneratedFiles(images: GeneratedFile[]): NormalizedImageResult[] {
+  return images.map((image) => ({
+    id: createId(),
+    source: 'base64',
+    src: toDataUrl(image.base64, image.mediaType),
+    mimeType: image.mediaType,
+    extension: extensionFromMimeType(image.mediaType),
+  }));
+}
+
 function extractImageArray(payload: unknown) {
   if (Array.isArray((payload as { data?: unknown[] })?.data)) {
     return (payload as { data: unknown[] }).data;
@@ -39,7 +53,7 @@ function extractImageArray(payload: unknown) {
 
 export function normalizeImageResponse(
   payload: unknown,
-  responseMode: ResponseMode,
+  responseMode: 'auto' | 'base64' | 'url',
 ): NormalizedImageResult[] {
   const items = extractImageArray(payload);
 
@@ -85,7 +99,7 @@ export function normalizeImageResponse(
           src: toDataUrl(base64, mimeType),
           mimeType,
           fileName,
-          extension: mimeType.split('/')[1],
+          extension: extensionFromMimeType(mimeType),
         };
       }
 

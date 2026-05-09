@@ -61,7 +61,7 @@ export function PresetPanel({
                   <strong>{preset.name}</strong>
                   <p className="stack-card__meta">{preset.modelId || '未指定模型'} · {preset.size}</p>
                 </div>
-                <span>{preset.mode === 'reference' ? '图生图' : '文生图'}</span>
+                <span>{preset.mode === 'mask' ? '遮罩编辑' : preset.mode === 'image' ? '图生图' : '文生图'}</span>
               </div>
               <p className="stack-card__prompt">{preset.prompt}</p>
               <div className="button-row">

@@ -1,3 +1,5 @@
+import type { GenerationMode } from '../../lib/openai/ai-sdk-image-client';
+
 export interface ResultImage {
   id: string;
   src: string;
@@ -9,16 +11,17 @@ export interface ResultImage {
 
 export interface HistoryEntry {
   id: string;
-  providerId: string | null;
-  providerLabel: string;
   modelId: string;
   prompt: string;
-  negativePrompt: string;
   size: string;
   count: number;
   quality: string;
-  mode: 'text' | 'reference';
-  referencePreviewUrl?: string;
+  outputFormat: string;
+  background: string;
+  outputCompression: number;
+  mode: GenerationMode;
+  referencePreviewUrls?: string[];
+  maskPreviewUrl?: string;
   images: ResultImage[];
   createdAt: string;
 }
@@ -27,13 +30,13 @@ export interface PresetRecord {
   id: string;
   name: string;
   prompt: string;
-  negativePrompt: string;
   size: string;
   count: number;
   quality: string;
   outputFormat: string;
-  mode: 'text' | 'reference';
-  providerId: string | null;
+  background: string;
+  outputCompression: number;
+  mode: GenerationMode;
   modelId: string;
   createdAt: string;
 }

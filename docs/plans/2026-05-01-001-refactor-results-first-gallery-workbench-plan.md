@@ -76,7 +76,7 @@ The origin document defines the product as a browser-first personal image-genera
 
 ### Institutional Learnings
 
-- `docs/solutions/integration-issues/hc0-openai-compatible-image-generation-compatibility-2026-04-27.md` notes that model discovery compatibility and image-generation compatibility are separate concerns. The redesigned UI must not hide provider compatibility/fallback state so deeply that users cannot recover from partial compatibility.
+- `docs/solutions/integration-issues/openai-compatible-provider-image-generation-compatibility-2026-04-27.md` notes that model discovery compatibility and image-generation compatibility are separate concerns. The redesigned UI must not hide provider compatibility/fallback state so deeply that users cannot recover from partial compatibility.
 - The same learning warns that provider profiles and request normalization matter. History, presets, and reuse UI should not imply that display values like `auto` necessarily map one-to-one to API payload fields.
 - Generation errors should keep provider-specific recommendations available through the existing detail surface rather than only showing a generic failure banner.
 
@@ -444,7 +444,7 @@ The main experience should read as: browse results -> adjust prompt/controls -> 
 
 - **Origin document:** [docs/brainstorms/2026-04-27-openai-compatible-image-workbench-requirements.md](../brainstorms/2026-04-27-openai-compatible-image-workbench-requirements.md)
 - **Original implementation plan:** [docs/plans/2026-04-27-001-feat-openai-image-workbench-plan.md](2026-04-27-001-feat-openai-image-workbench-plan.md)
-- **Institutional learning:** [docs/solutions/integration-issues/hc0-openai-compatible-image-generation-compatibility-2026-04-27.md](../solutions/integration-issues/hc0-openai-compatible-image-generation-compatibility-2026-04-27.md)
+- **Institutional learning:** [docs/solutions/integration-issues/openai-compatible-provider-image-generation-compatibility-2026-04-27.md](../solutions/integration-issues/openai-compatible-provider-image-generation-compatibility-2026-04-27.md)
 - Related code: `src/app/App.tsx`
 - Related code: `src/components/layout/workbench-frame.tsx`
 - Related code: `src/features/results/result-gallery.tsx`

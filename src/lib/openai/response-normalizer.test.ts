@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeImageResponse } from './response-normalizer';
+import { normalizeGeneratedFiles, normalizeImageResponse } from './response-normalizer';
 
 describe('response-normalizer', () => {
   it('normalizes base64 data results', () => {
@@ -22,5 +22,21 @@ describe('response-normalizer', () => {
     );
 
     expect(result[0]?.src).toBe('https://example.com/image.png');
+  });
+
+  it('normalizes AI SDK generated files', () => {
+    const result = normalizeGeneratedFiles([
+      {
+        base64: 'abc123',
+        uint8Array: new Uint8Array(),
+        mediaType: 'image/webp',
+      },
+    ]);
+
+    expect(result[0]).toMatchObject({
+      source: 'base64',
+      src: 'data:image/webp;base64,abc123',
+      extension: 'webp',
+    });
   });
 });

@@ -30,8 +30,10 @@ export function HistoryPanel({
             <article key={entry.id} className="stack-card stack-card--asset">
               <div className="stack-card__header">
                 <div>
-                  <strong>{entry.providerLabel}</strong>
-                  <p className="stack-card__meta">{entry.modelId || '未指定模型'} · {entry.size}</p>
+                  <strong>{entry.modelId || '未指定模型'}</strong>
+                  <p className="stack-card__meta">
+                    {entry.mode === 'mask' ? '遮罩编辑' : entry.mode === 'image' ? '图生图' : '文生图'} · {entry.size}
+                  </p>
                 </div>
                 <span>{entry.createdAt.slice(11, 16)}</span>
               </div>

@@ -17,7 +17,9 @@ describe('generation-form', () => {
         onChangeForm={onChangeForm}
         onGenerate={vi.fn()}
         onClear={vi.fn()}
-        onSelectReferenceFile={vi.fn()}
+        onAddReferenceFiles={vi.fn()}
+        onRemoveReferenceImage={vi.fn()}
+        onSelectMaskFile={vi.fn()}
       />,
     );
 
@@ -31,8 +33,11 @@ describe('generation-form', () => {
     render(
       <GenerationForm
         form={createDefaultGenerationFormState({
-          mode: 'reference',
-          referencePreviewUrl: 'blob:reference-image',
+          mode: 'image',
+          referenceImages: [{
+            file: new File(['fake'], 'reference.png', { type: 'image/png' }),
+            previewUrl: 'blob:reference-image',
+          }],
         })}
         selectedModelLabel="gpt-image-1"
         supportsReferenceImages
@@ -41,13 +46,15 @@ describe('generation-form', () => {
         onChangeForm={vi.fn()}
         onGenerate={vi.fn()}
         onClear={vi.fn()}
-        onSelectReferenceFile={vi.fn()}
+        onAddReferenceFiles={vi.fn()}
+        onRemoveReferenceImage={vi.fn()}
+        onSelectMaskFile={vi.fn()}
       />,
     );
 
-    expect(screen.getByText('参考图已附加')).toBeInTheDocument();
+    expect(screen.getAllByText('1 张参考图')).toHaveLength(2);
     expect(screen.getByText('参考图请求')).toBeInTheDocument();
-    expect(screen.getByText('这张图片会随下一次图生图请求发送。')).toBeInTheDocument();
+    expect(screen.getByText('最多 16 张，会随下一次图生图或 mask 请求发送。')).toBeInTheDocument();
   });
 
   it('keeps prompt editing and generate actions available', async () => {
@@ -65,7 +72,9 @@ describe('generation-form', () => {
         onChangeForm={onChangeForm}
         onGenerate={onGenerate}
         onClear={vi.fn()}
-        onSelectReferenceFile={vi.fn()}
+        onAddReferenceFiles={vi.fn()}
+        onRemoveReferenceImage={vi.fn()}
+        onSelectMaskFile={vi.fn()}
       />,
     );
 
