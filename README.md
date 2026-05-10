@@ -175,7 +175,7 @@ Build output directory: dist
 Node.js version: 22
 ```
 
-GitHub Actions 自动部署仍需要 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID` repository secrets，它们只用于 Cloudflare 部署鉴权。详细步骤见 `docs/deployment/cloudflare.md`。
+GitHub Actions 只做验证，不执行部署；真正的线上发布由 Cloudflare 控制台绑定 GitHub 仓库后自动完成。详细步骤见 `docs/deployment/cloudflare.md`。
 
 ## 使用路径
 
