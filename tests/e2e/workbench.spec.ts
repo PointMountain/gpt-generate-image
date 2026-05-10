@@ -13,7 +13,10 @@ test('renders the workbench shell', async ({ page }) => {
 });
 
 test('fetches image models and uses custom dropdown controls', async ({ page }) => {
-  await page.route('https://api.openai.com/v1/models', async (route) => {
+  let modelRequestHeaders: Record<string, string> | undefined;
+
+  await page.route('**/api/openai/models', async (route) => {
+    modelRequestHeaders = route.request().headers();
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -31,6 +34,9 @@ test('fetches image models and uses custom dropdown controls', async ({ page }) 
   await page.getByLabel('OpenAI API key').fill('sk-test');
   await page.getByLabel('OpenAI 创作控制条').getByRole('button', { name: '拉取模型' }).click();
   await expect(page.getByText('已发现 2 个图片模型。')).toBeVisible();
+  expect(modelRequestHeaders?.authorization).toBe('Bearer sk-test');
+  expect(modelRequestHeaders?.['x-openai-base-url']).toBe('https://api.openai.com/v1');
+  expect(modelRequestHeaders?.['x-openai-use-proxy']).toBe('true');
 
   await page.getByRole('button', { name: /图片模型/ }).click();
   await page.getByRole('option', { name: /GPT Image 2/ }).click();

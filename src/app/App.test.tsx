@@ -44,7 +44,7 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'OpenAI 设置' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '当前结果' })).toBeInTheDocument();
     expect(within(screen.getByLabelText('OpenAI 创作控制条')).getByText('代理')).toBeInTheDocument();
-    expect(within(screen.getByLabelText('OpenAI 创作控制条')).getByText('off')).toBeInTheDocument();
+    expect(within(screen.getByLabelText('OpenAI 创作控制条')).getByText('on')).toBeInTheDocument();
   });
 
   it('starts new page loads at the top of the document', () => {

@@ -57,3 +57,6 @@ jobs:
 
       - name: Build Cloudflare static site
         run: pnpm run build
+
+      - name: Validate Cloudflare Worker bundle
+        run: pnpm exec wrangler deploy --dry-run
