@@ -9,8 +9,8 @@ import {
 import { GenerationScreen } from './screens/generation-screen';
 import { runGenerateCommand, type GenerateCommandResult } from '../commands/generate-result';
 import type { GenerationMode } from '../../lib/openai/ai-sdk-image-client';
-import { HistoryScreen } from './screens/history-screen';
 import { loadTerminalHistory, type TerminalHistoryEntry } from '../history/terminal-history-store';
+import { openHistoryFile } from '../history/open-history-file';
 
 export interface ConfigPersistenceResult {
   ok: boolean;
@@ -146,19 +146,32 @@ export function TuiApp({
     }
   }
 
+  async function handleOpenHistoryEntry(entry: TerminalHistoryEntry) {
+    const firstFile = entry.outputFiles[0];
+
+    if (!firstFile) {
+      return {
+        ok: false,
+        path: '',
+        detail: `历史记录没有可打开的输出文件：${entry.prompt}`,
+      };
+    }
+
+    return openHistoryFile(firstFile.path);
+  }
+
   return (
     <Box flexDirection="column">
       <GenerationScreen
         config={config}
         configPersistenceError={configPersistenceError}
+        historyEntries={historyEntries}
         isGenerating={isGenerating}
         result={result}
         onSaveConfig={handleSaveConfig}
         onGenerate={handleGenerate}
+        onOpenHistoryEntry={handleOpenHistoryEntry}
       />
-      <Box marginTop={1}>
-        <HistoryScreen entries={historyEntries} />
-      </Box>
     </Box>
   );
 }

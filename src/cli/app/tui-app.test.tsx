@@ -8,6 +8,7 @@ describe('TuiApp', () => {
 
     expect(lastFrame()).toContain('TokenCanvas CLI');
     expect(lastFrame()).toContain('/help');
+    expect(lastFrame()).not.toContain('最近结果');
   });
 
   it('keeps missing API key inside the slash command workspace', () => {

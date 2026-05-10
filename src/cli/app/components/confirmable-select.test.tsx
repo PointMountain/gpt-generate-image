@@ -43,4 +43,38 @@ describe('ConfirmableSelect', () => {
 
     expect(onSubmit).toHaveBeenCalledWith('image');
   });
+
+  it('supports controlled highlight updates without keeping a second selection source', async () => {
+    const onSubmit = vi.fn();
+    const onHighlightChange = vi.fn();
+    const { stdin, rerender } = render(
+      <ConfirmableSelect
+        options={options}
+        value="text"
+        onHighlightChange={onHighlightChange}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    await waitForInput();
+    stdin.write('\u001B[B');
+    await waitForInput();
+
+    expect(onHighlightChange).toHaveBeenCalledWith('image', 1);
+
+    rerender(
+      <ConfirmableSelect
+        options={options}
+        value="image"
+        onHighlightChange={onHighlightChange}
+        onSubmit={onSubmit}
+      />,
+    );
+    await waitForInput();
+
+    stdin.write('\r');
+    await waitForInput();
+
+    expect(onSubmit).toHaveBeenCalledWith('image');
+  });
 });
