@@ -6,16 +6,19 @@ import {
   type OpenAIProviderSettings,
 } from '@ai-sdk/openai';
 import { resolveOpenAIProviderTransport } from './openai-endpoint';
+import type { ImageBinaryInput, ImageReferenceInput } from './image-file-adapter';
 import { normalizeGeneratedFiles, type NormalizedImageResult } from './response-normalizer';
 
 export type GenerationMode = 'text' | 'image' | 'mask';
+export type { ImageBinaryInput, ImageReferenceInput } from './image-file-adapter';
 
-const MAX_IMAGE_FILE_BYTES = 10 * 1024 * 1024;
-const MAX_TOTAL_IMAGE_BYTES = 40 * 1024 * 1024;
+export const MAX_IMAGE_FILE_BYTES = 10 * 1024 * 1024;
+export const MAX_TOTAL_IMAGE_BYTES = 40 * 1024 * 1024;
 
 export interface OpenAIImageSettings {
   apiKey: string;
   baseURL: string;
+  useProxy: boolean;
   model: string;
   timeoutSeconds: number;
   defaultSize: string;
@@ -23,11 +26,6 @@ export interface OpenAIImageSettings {
   defaultOutputFormat: string;
   defaultBackground: string;
   defaultOutputCompression: number;
-}
-
-export interface ImageReferenceInput {
-  file: File;
-  previewUrl: string;
 }
 
 export interface OpenAIImageGenerationInput {
@@ -40,7 +38,7 @@ export interface OpenAIImageGenerationInput {
   outputCompression: number;
   mode: GenerationMode;
   referenceImages: ImageReferenceInput[];
-  maskFile: File | null;
+  maskFile: ImageBinaryInput | null;
 }
 
 export interface ClientFailure {
@@ -94,7 +92,7 @@ export function buildOpenAIProviderOptions(input: OpenAIImageGenerationInput, mo
   return Object.keys(openai).length ? { openai } : undefined;
 }
 
-async function fileToDataContent(file: File): Promise<DataContent> {
+async function fileToDataContent(file: ImageBinaryInput): Promise<DataContent> {
   return new Uint8Array(await file.arrayBuffer());
 }
 
@@ -163,7 +161,7 @@ async function buildPrompt(input: OpenAIImageGenerationInput) {
 
 function createTimeoutController(timeoutSeconds: number, externalSignal?: AbortSignal) {
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), Math.max(timeoutSeconds, 1) * 1000);
+  const timeoutId = globalThis.setTimeout(() => controller.abort(), Math.max(timeoutSeconds, 1) * 1000);
 
   const abortFromExternalSignal = () => controller.abort();
   externalSignal?.addEventListener('abort', abortFromExternalSignal, { once: true });
@@ -171,7 +169,7 @@ function createTimeoutController(timeoutSeconds: number, externalSignal?: AbortS
   return {
     signal: controller.signal,
     cleanup: () => {
-      window.clearTimeout(timeoutId);
+      globalThis.clearTimeout(timeoutId);
       externalSignal?.removeEventListener('abort', abortFromExternalSignal);
     },
   };
@@ -246,7 +244,7 @@ export async function generateOpenAIImages(
   options: { abortSignal?: AbortSignal } = {},
   deps: GenerateOpenAIImagesDeps = {},
 ): Promise<ClientResult> {
-  const transport = resolveOpenAIProviderTransport(settings.baseURL);
+  const transport = resolveOpenAIProviderTransport(settings.baseURL, undefined, settings.useProxy);
   if (!transport.ok) {
     return {
       ok: false,

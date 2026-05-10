@@ -1,4 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { lookup } from 'node:dns/promises';
+import { createProxyAwareFetch, parseProxyPreference } from './proxy-aware-fetch';
 
 const DEFAULT_ALLOWED_PROXY_HOSTS = ['*'];
 const MAX_PROXY_REQUEST_BYTES = 40 * 1024 * 1024;
@@ -14,6 +16,8 @@ class OpenAIProxyError extends Error {
     super(message);
   }
 }
+
+type ProxyDnsLookup = typeof lookup;
 
 export function getAllowedOpenAIProxyHosts(envValue = process.env.OPENAI_DEV_PROXY_ALLOWED_HOSTS) {
   if (!envValue) {
@@ -57,9 +61,23 @@ function isBlockedProxyHostname(hostname: string) {
   );
 }
 
-export function validateOpenAIProxyBaseURL(
+function isBlockedProxyAddress(address: string) {
+  return isBlockedProxyHostname(address);
+}
+
+async function resolveProxyHostAddresses(hostname: string, lookupImpl: ProxyDnsLookup) {
+  try {
+    const results = await lookupImpl(hostname, { all: true });
+    return results.map((result) => result.address);
+  } catch {
+    throw new OpenAIProxyError(400, 'unresolvable_base_url_host', 'baseURL host cannot be resolved');
+  }
+}
+
+export async function validateOpenAIProxyBaseURL(
   baseURLValue: string,
   allowedHosts = getAllowedOpenAIProxyHosts(),
+  lookupImpl: ProxyDnsLookup = lookup,
 ) {
   let baseURL: URL;
   try {
@@ -81,11 +99,16 @@ export function validateOpenAIProxyBaseURL(
     throw new OpenAIProxyError(400, 'base_url_host_not_allowed', 'baseURL host is not allowed by the dev proxy');
   }
 
+  const resolvedAddresses = await resolveProxyHostAddresses(hostname, lookupImpl);
+  if (resolvedAddresses.some((address) => isBlockedProxyAddress(address))) {
+    throw new OpenAIProxyError(400, 'blocked_base_url_host', 'baseURL resolves to a blocked host');
+  }
+
   return baseURL;
 }
 
-export function buildOpenAIProxyTarget(requestUrl: string | undefined, baseURLValue: string) {
-  const baseURL = validateOpenAIProxyBaseURL(baseURLValue);
+export async function buildOpenAIProxyTarget(requestUrl: string | undefined, baseURLValue: string) {
+  const baseURL = await validateOpenAIProxyBaseURL(baseURLValue);
   const incoming = new URL(requestUrl || '/', 'http://openai-dev-proxy.local');
   const strippedPathname = incoming.pathname.replace(/^\/api\/openai/, '') || '/';
   const relativePathname = strippedPathname.replace(/^\/+/, '');
@@ -148,13 +171,42 @@ async function readUpstreamBody(upstream: Response, maxBytes = MAX_PROXY_RESPONS
 function createProxyHeaders(request: IncomingMessage) {
   const headers = new Headers();
   Object.entries(request.headers).forEach(([key, value]) => {
-    if (!value || ['host', 'content-length', 'connection', 'origin', 'referer', 'x-openai-base-url'].includes(key.toLowerCase())) {
+    if (!value || !isAllowedProxyRequestHeader(key)) {
       return;
     }
 
     headers.set(key, Array.isArray(value) ? value.join(', ') : value);
   });
   return headers;
+}
+
+function isAllowedProxyRequestHeader(headerName: string) {
+  const normalized = headerName.toLowerCase();
+
+  return [
+    'accept',
+    'accept-language',
+    'authorization',
+    'content-type',
+    'openai-organization',
+    'openai-project',
+    'user-agent',
+  ].includes(normalized);
+}
+
+function isAllowedProxyResponseHeader(headerName: string) {
+  const normalized = headerName.toLowerCase();
+
+  return (
+    normalized === 'content-type' ||
+    normalized === 'content-disposition' ||
+    normalized === 'cache-control' ||
+    normalized === 'etag' ||
+    normalized === 'last-modified' ||
+    normalized === 'retry-after' ||
+    normalized === 'x-request-id' ||
+    normalized.startsWith('openai-')
+  );
 }
 
 function writeProxyJson(response: ServerResponse, statusCode: number, payload: Record<string, unknown>) {
@@ -170,6 +222,7 @@ function writeProxyJson(response: ServerResponse, statusCode: number, payload: R
 export async function handleOpenAIProxy(request: IncomingMessage, response: ServerResponse) {
   const baseURL = request.headers['x-openai-base-url'];
   const baseURLValue = Array.isArray(baseURL) ? baseURL[0] : baseURL;
+  const useProxy = parseProxyPreference(request.headers['x-openai-use-proxy']);
 
   if (!baseURLValue) {
     writeProxyJson(response, 400, { error: 'missing_or_invalid_base_url' });
@@ -191,10 +244,10 @@ export async function handleOpenAIProxy(request: IncomingMessage, response: Serv
   });
 
   try {
-    const target = buildOpenAIProxyTarget(request.url, baseURLValue);
+    const target = await buildOpenAIProxyTarget(request.url, baseURLValue);
     const body = await readRequestBody(request);
 
-    const upstream = await fetch(target, {
+    const upstream = await createProxyAwareFetch(useProxy)(target, {
       method: request.method,
       headers: createProxyHeaders(request),
       body,
@@ -203,7 +256,7 @@ export async function handleOpenAIProxy(request: IncomingMessage, response: Serv
 
     response.statusCode = upstream.status;
     upstream.headers.forEach((value, key) => {
-      if (!['content-length', 'content-encoding', 'transfer-encoding', 'connection'].includes(key.toLowerCase())) {
+      if (isAllowedProxyResponseHeader(key)) {
         response.setHeader(key, value);
       }
     });

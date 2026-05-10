@@ -76,6 +76,7 @@ export function OpenAISettingsPanel({
         <div className="provider-status-card__badges">
           <span className="provider-tag">OpenAI</span>
           <span className="provider-tag">{settings.timeoutSeconds}s</span>
+          <span className="provider-tag">代理 {settings.useProxy ? 'on' : 'off'}</span>
         </div>
       </div>
 
@@ -202,6 +203,17 @@ export function OpenAISettingsPanel({
             />
             {errors.timeoutSeconds ? <span className="field__error">{errors.timeoutSeconds}</span> : null}
           </div>
+
+          <label className="toggle-row" htmlFor="openai-use-proxy">
+            <input
+              id="openai-use-proxy"
+              type="checkbox"
+              checked={settings.useProxy}
+              onChange={(event) => updateField('useProxy', event.target.checked)}
+            />
+            <span>使用本机环境代理</span>
+          </label>
+          <span className="field__hint">默认关闭。开启后本地 dev proxy 会继承 HTTP_PROXY/HTTPS_PROXY/ALL_PROXY。</span>
         </div>
       </details>
     </div>

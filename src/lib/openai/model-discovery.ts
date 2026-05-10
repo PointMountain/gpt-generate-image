@@ -1,5 +1,6 @@
 import type { OpenAIImageSettings } from './ai-sdk-image-client';
 import { resolveOpenAIModelsRequestTarget } from './openai-endpoint';
+import { createProxyAwareFetch } from './proxy-aware-fetch';
 
 const GPT_IMAGE_RANK = ['gpt-image-2', 'gpt-image-1.5', 'gpt-image-1-mini', 'gpt-image-1'];
 
@@ -257,8 +258,8 @@ export async function fetchOpenAIImageModels(
   settings: OpenAIImageSettings,
   deps: FetchOpenAIImageModelsDeps = {},
 ): Promise<ModelDiscoveryResult> {
-  const fetcher = deps.fetcher ?? fetch;
-  const target = resolveOpenAIModelsRequestTarget(settings.baseURL, deps.hostname);
+  const fetcher = deps.fetcher ?? createProxyAwareFetch(settings.useProxy);
+  const target = resolveOpenAIModelsRequestTarget(settings.baseURL, deps.hostname, settings.useProxy);
   if (!target.ok) {
     return {
       ok: false,
@@ -275,6 +276,7 @@ export async function fetchOpenAIImageModels(
 
   if (target.baseURLHeader) {
     headers.set('x-openai-base-url', target.baseURLHeader);
+    headers.set('x-openai-use-proxy', target.useProxyHeader);
   }
 
   try {

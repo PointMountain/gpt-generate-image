@@ -15,6 +15,7 @@ describe('openai-settings-store', () => {
     const settings = createDefaultOpenAISettings({
       apiKey: 'sk-test',
       baseURL: 'https://example.com/v1',
+      useProxy: true,
       model: 'gpt-image-2',
       defaultQuality: 'high',
     });
@@ -24,6 +25,7 @@ describe('openai-settings-store', () => {
     expect(loadOpenAISettings()).toMatchObject({
       apiKey: 'sk-test',
       baseURL: 'https://example.com/v1',
+      useProxy: true,
       model: 'gpt-image-2',
       defaultQuality: 'high',
       needsReconfiguration: false,
@@ -36,6 +38,7 @@ describe('openai-settings-store', () => {
     expect(loadOpenAISettings()).toMatchObject({
       model: 'gpt-image-1',
       timeoutSeconds: 180,
+      useProxy: false,
       needsReconfiguration: true,
     });
   });
@@ -70,6 +73,7 @@ describe('openai-settings-store', () => {
       baseURL: 'https://api.openai.com/v1',
       model: 'gpt-image-2',
       timeoutSeconds: 180,
+      useProxy: false,
       defaultSize: '1024x1024',
       defaultOutputFormat: 'auto',
       defaultBackground: 'transparent',

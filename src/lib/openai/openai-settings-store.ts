@@ -27,6 +27,7 @@ export function createDefaultOpenAISettings(
   return {
     apiKey: '',
     baseURL: 'https://api.openai.com/v1',
+    useProxy: false,
     model: 'gpt-image-1',
     timeoutSeconds: 180,
     defaultSize: '1024x1024',
@@ -74,6 +75,7 @@ function normalizeStoredSettings(stored: Partial<OpenAISettingsStoreState>) {
   return createDefaultOpenAISettings({
     apiKey: readString(stored.apiKey, defaults.apiKey),
     baseURL: readString(stored.baseURL, defaults.baseURL),
+    useProxy: typeof stored.useProxy === 'boolean' ? stored.useProxy : defaults.useProxy,
     model: readString(stored.model, defaults.model),
     timeoutSeconds: readFiniteNumber(stored.timeoutSeconds, defaults.timeoutSeconds, 5),
     defaultSize: readEnum(stored.defaultSize, SIZE_VALUES, defaults.defaultSize),
