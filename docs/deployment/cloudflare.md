@@ -17,14 +17,11 @@ Node.js version: 22
 
 不要在 Cloudflare 环境变量里配置 `OPENAI_API_KEY` 或 `TOKENCANVAS_PROXY_TOKEN`。这两个值不属于静态部署运行时。
 
-## GitHub Actions Secrets
+## GitHub Actions
 
-GitHub Actions 自动部署仍需要 Cloudflare 部署凭据：
+GitHub Actions 只做验证，不执行部署。真正的线上发布由 Cloudflare 控制台绑定的 GitHub 仓库集成负责。
 
-- `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_ACCOUNT_ID`
-
-这些 secret 只用于 `wrangler deploy` 鉴权，不会进入浏览器 bundle。
+因此仓库不需要配置 `CLOUDFLARE_API_TOKEN` 或 `CLOUDFLARE_ACCOUNT_ID` repository secrets。
 
 ## Local Verification
 
@@ -43,7 +40,7 @@ pnpm run build
 pnpm run deploy:cloudflare
 ```
 
-`deploy:cloudflare` 会先执行 `pnpm run build`，再调用 `wrangler deploy` 发布静态资源。真实部署需要已登录 Wrangler，或在 CI 中提供 Cloudflare 部署 secrets。
+`deploy:cloudflare` 会先执行 `pnpm run build`，再调用 `wrangler deploy` 发布静态资源。它只作为本地手动部署命令；常规线上部署使用 Cloudflare 控制台的 GitHub 集成。
 
 ## Runtime Behavior
 
