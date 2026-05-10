@@ -563,6 +563,7 @@ export function App() {
         <span className="pill pill--muted">
           {settings.model ? `模型：${settings.model}` : '等待填写模型'}
         </span>
+        <span className="pill pill--muted">代理：{settings.useProxy ? 'on' : 'off'}</span>
       </div>
     </>
   );
@@ -596,6 +597,10 @@ export function App() {
         <div>
           <span>连接</span>
           <strong>{settings.apiKey ? `${settings.timeoutSeconds}s timeout` : '等待 API key'}</strong>
+        </div>
+        <div>
+          <span>代理</span>
+          <strong>{settings.useProxy ? 'on' : 'off'}</strong>
         </div>
       </div>
       <div className="studio-command-bar__actions">

@@ -146,5 +146,6 @@ describe('model-discovery', () => {
     }));
     const headers = fetchMock.mock.calls[0]?.[1]?.headers as Headers;
     expect(headers.get('x-openai-base-url')).toBe('https://example.com/v1');
+    expect(headers.get('x-openai-use-proxy')).toBe('false');
   });
 });

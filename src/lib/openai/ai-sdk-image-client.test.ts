@@ -2,11 +2,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ImageModel } from 'ai';
 import type { OpenAIProviderSettings } from '@ai-sdk/openai';
 import { buildOpenAIProviderOptions, generateOpenAIImages, type OpenAIImageGenerationInput, type OpenAIImageSettings } from './ai-sdk-image-client';
+import { createImageInputFromBytes } from './image-file-adapter';
 
 function createSettings(overrides: Partial<OpenAIImageSettings> = {}): OpenAIImageSettings {
   return {
     apiKey: 'test-key',
     baseURL: 'https://api.openai.com/v1',
+    useProxy: false,
     model: 'gpt-image-1',
     timeoutSeconds: 30,
     defaultSize: '1024x1024',
@@ -148,6 +150,44 @@ describe('ai-sdk-image-client', () => {
     }));
   });
 
+  it('supports runtime-neutral image inputs without browser File objects', async () => {
+    const runGenerateImage = vi.fn().mockResolvedValue({
+      images: [{ base64: 'abc123', mediaType: 'image/png', uint8Array: new Uint8Array() }],
+      warnings: [],
+      providerMetadata: {},
+    });
+
+    const result = await generateOpenAIImages(
+      createSettings(),
+      createInput({
+        mode: 'image',
+        referenceImages: [{
+          file: createImageInputFromBytes({
+            bytes: new TextEncoder().encode('node-image'),
+            name: 'reference.png',
+            type: 'image/png',
+          }),
+          previewUrl: 'file:///reference.png',
+        }],
+      }),
+      {},
+      {
+        createOpenAIProvider: vi.fn(() => createProvider()),
+        runGenerateImage,
+      },
+    );
+
+    if (!result.ok) {
+      throw new Error(result.detail);
+    }
+
+    expect(runGenerateImage).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: expect.objectContaining({
+        images: [expect.any(Uint8Array)],
+      }),
+    }));
+  });
+
   it('sends structured mask prompt when mask editing is selected', async () => {
     const referenceFile = new File(['source-image'], 'source.png', { type: 'image/png' });
     const maskFile = new File(['mask-image'], 'mask.png', { type: 'image/png' });
@@ -231,6 +271,7 @@ describe('ai-sdk-image-client', () => {
     }));
     const proxiedHeaders = fetchMock.mock.calls[0]?.[1]?.headers as Headers;
     expect(proxiedHeaders.get('x-openai-base-url')).toBe('https://example.com/v1');
+    expect(proxiedHeaders.get('x-openai-use-proxy')).toBe('false');
   });
 
   it('fails fast when baseURL is not a valid HTTPS endpoint', async () => {
