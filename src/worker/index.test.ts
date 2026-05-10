@@ -37,40 +37,33 @@ describe('token canvas worker', () => {
     }));
   });
 
-  it('routes OpenAI API requests to Worker proxy before static assets', async () => {
+  it('serves OpenAI API-looking paths as static fallback instead of proxying secrets', async () => {
     const assets = createAssets();
     const env: TokenCanvasWorkerEnv = {
       ASSETS: assets,
-      OPENAI_API_KEY: 'sk-worker-secret',
-      TOKENCANVAS_PROXY_TOKEN: 'proxy-token',
     };
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [] }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    }));
+    const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
 
     const response = await handleTokenCanvasWorkerRequest(
-      new Request('https://token-canvas.example/api/openai/models', {
-        headers: { 'x-tokencanvas-proxy-token': 'proxy-token' },
-      }),
+      new Request('https://token-canvas.example/api/openai/models'),
       env,
     );
 
     expect(response.status).toBe(200);
-    expect(assets.fetch).not.toHaveBeenCalled();
-    expect(fetchMock).toHaveBeenCalledWith('https://api.openai.com/v1/models', expect.any(Object));
+    expect(assets.fetch).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('does not serve API requests from static assets when proxy configuration is missing', async () => {
-    const assets = createAssets();
-
+  it('fails closed when the static assets binding is missing', async () => {
     const response = await handleTokenCanvasWorkerRequest(
-      new Request('https://token-canvas.example/api/openai/models'),
-      { ASSETS: assets },
+      new Request('https://token-canvas.example/'),
+      {},
     );
 
     expect(response.status).toBe(500);
-    expect(assets.fetch).not.toHaveBeenCalled();
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'missing_assets_binding',
+    });
   });
 });

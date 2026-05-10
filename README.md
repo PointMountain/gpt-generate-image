@@ -151,19 +151,12 @@ TOKENCANVAS_CONFIG_DIR=.tokencanvas-tmp pnpm cli
 
 ## Cloudflare 部署
 
-Cloudflare 部署使用 Workers static assets：Worker 托管 Web UI 静态资源，并用 `/api/openai/*` 代理模型列表、图片生成和图片编辑请求。
-
-部署前需要配置 Worker secrets：
-
-```bash
-pnpm exec wrangler secret put OPENAI_API_KEY
-pnpm exec wrangler secret put TOKENCANVAS_PROXY_TOKEN
-```
+Cloudflare 部署只托管静态 Web UI。用户在页面里填写自己的 OpenAI API key 和 baseURL，凭据只保存在当前浏览器本地；Cloudflare 不保存 OpenAI key，也不代理 OpenAI 请求。
 
 本地只构建验证：
 
 ```bash
-pnpm run build:cloudflare
+pnpm run build
 ```
 
 真实部署：
@@ -172,7 +165,17 @@ pnpm run build:cloudflare
 pnpm run deploy:cloudflare
 ```
 
-公开部署时必须保护 `/api/openai/*`，因为 Worker 持有服务端 OpenAI API key。最低要求是 `TOKENCANVAS_PROXY_TOKEN`；更高强度访问控制应使用 Cloudflare Access / Zero Trust。详细步骤见 `docs/deployment/cloudflare.md`。
+在 Cloudflare 连接仓库创建应用时填写：
+
+```text
+Project name: token-canvas
+Build command: pnpm run build
+Deploy command: pnpm exec wrangler deploy
+Build output directory: dist
+Node.js version: 22
+```
+
+GitHub Actions 自动部署仍需要 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID` repository secrets，它们只用于 Cloudflare 部署鉴权。详细步骤见 `docs/deployment/cloudflare.md`。
 
 ## 使用路径
 
@@ -190,16 +193,17 @@ TokenCanvas 当前按个人本地工具设计：
 - OpenAI API key 只保存在当前浏览器本地
 - 历史记录和预设也只保存在当前浏览器
 - 终端模式的 API key、默认参数和最近历史保存在独立的终端配置目录
-- Cloudflare 托管模式的 OpenAI API key 保存在 Worker secret 中，浏览器只保存部署访问 token
+- Cloudflare 托管的 Web UI 也是静态页面模式，仍由用户在浏览器本地保存 OpenAI API key 和 baseURL
 - 当前不提供云端历史同步、多人账号、团队权限或远程任务队列
-- 如果公开部署，应额外使用 Cloudflare Access / Zero Trust 保护入口
+- 如果公开部署，应额外使用 Cloudflare Access / Zero Trust 保护页面入口
 
 ## 常用命令
 
 ```bash
 pnpm cli
 pnpm cli -- generate --prompt "..." --output-dir ./tokencanvas-output
-pnpm run build:cloudflare
+pnpm run build
+pnpm run deploy:cloudflare
 pnpm run build:package
 pnpm run package:smoke
 pnpm test

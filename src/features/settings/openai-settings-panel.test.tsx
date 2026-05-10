@@ -41,27 +41,4 @@ describe('openai-settings-panel', () => {
     await user.click(screen.getByRole('button', { name: '保存 OpenAI 设置' }));
     expect(onSave).toHaveBeenCalled();
   });
-
-  it('renders hosted proxy settings without browser API key fields', async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-
-    render(
-      <OpenAISettingsPanel
-        settings={createDefaultOpenAISettings({ hostedProxy: true })}
-        errors={{ proxyAccessToken: '部署访问 token 不能为空。' }}
-        onChange={onChange}
-        onSave={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByText('Cloudflare Worker 代理')).toBeInTheDocument();
-    expect(screen.getByLabelText('部署访问 token')).toBeInTheDocument();
-    expect(screen.queryByLabelText('OpenAI API key')).not.toBeInTheDocument();
-    expect(screen.queryByText('高级连接设置')).not.toBeInTheDocument();
-    expect(screen.getByText('部署访问 token 不能为空。')).toBeInTheDocument();
-
-    await user.type(screen.getByLabelText('部署访问 token'), 'deploy-token');
-    expect(onChange).toHaveBeenCalled();
-  });
 });

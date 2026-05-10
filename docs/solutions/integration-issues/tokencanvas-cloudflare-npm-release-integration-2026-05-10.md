@@ -24,6 +24,8 @@ tags: [cloudflare, npm, worker, package-smoke, github-actions, hosted-proxy, rel
 
 # TokenCanvas Cloudflare 与 npm 发布集成收口
 
+> Update 2026-05-10: Cloudflare deployment has since been simplified to static Web UI hosting. The hosted Worker proxy guidance below is historical context for the superseded design, not the current deployment path.
+
 ## Problem
 
 TokenCanvas 要同时提供 Cloudflare 托管 Web UI 和 npm 安装后的 CLI/TUI/Web UI。初版发布链路看起来能构建和打包，但 `ce-code-review` 发现几个跨运行时契约没有真正被验证：Cloudflare UI 默认不走 Worker proxy、Worker 不支持 image edit 路由、npm smoke 没启动新增的 `tokencanvas web`，以及发布 workflow 权限过宽。
