@@ -9,6 +9,8 @@ function createSettings(overrides: Partial<OpenAIImageSettings> = {}): OpenAIIma
     apiKey: 'test-key',
     baseURL: 'https://api.openai.com/v1',
     useProxy: false,
+    hostedProxy: false,
+    proxyAccessToken: '',
     model: 'gpt-image-1',
     timeoutSeconds: 30,
     defaultSize: '1024x1024',
@@ -272,6 +274,50 @@ describe('ai-sdk-image-client', () => {
     const proxiedHeaders = fetchMock.mock.calls[0]?.[1]?.headers as Headers;
     expect(proxiedHeaders.get('x-openai-base-url')).toBe('https://example.com/v1');
     expect(proxiedHeaders.get('x-openai-use-proxy')).toBe('false');
+  });
+
+  it('uses hosted proxy fetch without a browser OpenAI API key in hosted mode', async () => {
+    const provider = createProvider();
+    let capturedOptions: OpenAIProviderSettings | undefined;
+    const createOpenAIProvider = vi.fn((options: OpenAIProviderSettings) => {
+      capturedOptions = options;
+      return provider;
+    });
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await generateOpenAIImages(
+      createSettings({
+        apiKey: '',
+        hostedProxy: true,
+        proxyAccessToken: 'deploy-token',
+        baseURL: 'http://invalid.local/v1',
+      }),
+      createInput(),
+      {},
+      {
+        createOpenAIProvider,
+        runGenerateImage: vi.fn().mockResolvedValue({
+          images: [{ base64: 'abc123', mediaType: 'image/png', uint8Array: new Uint8Array() }],
+          warnings: [],
+          providerMetadata: {},
+        }),
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(capturedOptions?.baseURL).toBeUndefined();
+    expect(capturedOptions?.apiKey).toBe('hosted-proxy');
+
+    await capturedOptions?.fetch?.('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: { authorization: 'Bearer browser-key' },
+    });
+
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Headers;
+    expect(fetchMock).toHaveBeenCalledWith('/api/openai/images/generations', expect.any(Object));
+    expect(headers.get('authorization')).toBeNull();
+    expect(headers.get('x-tokencanvas-proxy-token')).toBe('deploy-token');
   });
 
   it('fails fast when baseURL is not a valid HTTPS endpoint', async () => {

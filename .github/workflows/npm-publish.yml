@@ -1,0 +1,98 @@
+name: npm Publish
+
+on:
+  pull_request:
+    paths:
+      - package.json
+      - pnpm-lock.yaml
+      - scripts/build-package.mjs
+      - scripts/smoke-package.mjs
+      - src/cli/**
+      - src/lib/openai/**
+      - src/worker/**
+      - vite.config.ts
+  push:
+    tags:
+      - v*
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Test
+        run: pnpm test
+
+      - name: Typecheck Node surfaces
+        run: pnpm run typecheck:node
+
+      - name: End-to-end tests
+        run: pnpm run test:e2e
+
+      - name: Build package artifacts
+        run: pnpm run build:package
+
+      - name: Package smoke
+        run: pnpm run package:smoke
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build package artifacts
+        run: pnpm run build:package
+
+      - name: Package smoke
+        run: pnpm run package:smoke
+
+      - name: Verify tag matches package version
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          test "${GITHUB_REF_NAME}" = "v${PACKAGE_VERSION}"
+
+      - name: Confirm package name availability before first publish
+        run: npm view token-canvas version || true
+
+      - name: Publish package
+        run: npm publish --provenance --access public

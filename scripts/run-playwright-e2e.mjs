@@ -1,4 +1,8 @@
 import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
+
+const requireFromScript = createRequire(import.meta.url);
+const playwrightTestCli = requireFromScript.resolve('@playwright/test/cli');
 
 const env = {
   ...process.env,
@@ -12,7 +16,7 @@ const env = {
   all_proxy: '',
 };
 
-const child = spawn(process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm', ['exec', 'playwright', 'test'], {
+const child = spawn(process.execPath, [playwrightTestCli, 'test'], {
   stdio: 'inherit',
   env,
 });

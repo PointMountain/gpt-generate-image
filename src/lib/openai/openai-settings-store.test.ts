@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createDefaultOpenAISettings,
   loadOpenAISettings,
@@ -9,6 +9,10 @@ import {
 describe('openai-settings-store', () => {
   beforeEach(() => {
     window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('persists and reloads OpenAI settings', () => {
@@ -43,6 +47,14 @@ describe('openai-settings-store', () => {
     });
   });
 
+  it('defaults to hosted proxy when the Cloudflare build env is enabled', () => {
+    vi.stubEnv('VITE_TOKENCANVAS_HOSTED_PROXY', 'true');
+
+    expect(createDefaultOpenAISettings()).toMatchObject({
+      hostedProxy: true,
+    });
+  });
+
   it('validates the required API key and model fields', () => {
     expect(validateOpenAISettings(createDefaultOpenAISettings())).toMatchObject({
       apiKey: 'OpenAI API key 不能为空。',
@@ -54,6 +66,24 @@ describe('openai-settings-store', () => {
     }))).toMatchObject({
       model: '模型不能为空，默认可使用 gpt-image-1 或兼容端点支持的 gpt-image-2。',
     });
+  });
+
+  it('validates hosted proxy token instead of browser OpenAI key in hosted mode', () => {
+    expect(validateOpenAISettings(createDefaultOpenAISettings({
+      hostedProxy: true,
+      apiKey: '',
+      proxyAccessToken: '',
+      baseURL: 'http://invalid.local/v1',
+    }))).toMatchObject({
+      proxyAccessToken: '部署访问 token 不能为空。',
+    });
+
+    expect(validateOpenAISettings(createDefaultOpenAISettings({
+      hostedProxy: true,
+      apiKey: '',
+      proxyAccessToken: 'deploy-token',
+      baseURL: 'http://invalid.local/v1',
+    }))).toEqual({});
   });
 
   it('normalizes polluted stored settings before returning typed state', () => {
@@ -74,6 +104,8 @@ describe('openai-settings-store', () => {
       model: 'gpt-image-2',
       timeoutSeconds: 180,
       useProxy: false,
+      hostedProxy: false,
+      proxyAccessToken: '',
       defaultSize: '1024x1024',
       defaultOutputFormat: 'auto',
       defaultBackground: 'transparent',

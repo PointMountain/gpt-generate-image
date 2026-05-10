@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+  createOpenAIHostedProxyFetch,
   DEFAULT_OPENAI_BASE_URL,
   resolveOpenAIModelsRequestTarget,
   resolveOpenAIProviderTransport,
@@ -36,5 +37,46 @@ describe('openai-endpoint', () => {
       baseURLHeader: '',
       useProxyHeader: '',
     });
+  });
+
+  it('routes hosted proxy traffic through /api/openai without validating browser baseURL', async () => {
+    expect(resolveOpenAIModelsRequestTarget('http://invalid.local/v1', 'token-canvas.example', false, true, 'deploy-token')).toMatchObject({
+      ok: true,
+      url: '/api/openai/models',
+      proxyAccessTokenHeader: 'deploy-token',
+      hostedProxy: true,
+    });
+
+    const providerTransport = resolveOpenAIProviderTransport('http://invalid.local/v1', 'token-canvas.example', false, true, 'deploy-token');
+    expect(providerTransport).toMatchObject({
+      ok: true,
+      baseURL: undefined,
+    });
+    if (providerTransport.ok) {
+      expect(providerTransport.fetch).toEqual(expect.any(Function));
+    }
+  });
+
+  it('adds hosted proxy access token and strips browser Authorization before fetch', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const hostedFetch = createOpenAIHostedProxyFetch('deploy-token');
+    await hostedFetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer browser-key',
+        'content-type': 'application/json',
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/openai/images/generations', expect.objectContaining({
+      method: 'POST',
+      headers: expect.any(Headers),
+    }));
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Headers;
+    expect(headers.get('authorization')).toBeNull();
+    expect(headers.get('x-tokencanvas-proxy-token')).toBe('deploy-token');
+    expect(headers.get('content-type')).toBe('application/json');
   });
 });

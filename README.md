@@ -63,6 +63,34 @@ http://127.0.0.1:5173
 
 请通过 `pnpm run dev` 或 `pnpm run preview` 运行，不要直接双击 `index.html`。
 
+## npm 安装
+
+TokenCanvas 的 npm 包名是 `token-canvas`，安装后提供 `tokencanvas` 命令：
+
+```bash
+npm install -g token-canvas
+```
+
+启动 TUI：
+
+```bash
+tokencanvas
+```
+
+运行一次生成：
+
+```bash
+tokencanvas generate --prompt "a cinematic perfume bottle" --output-dir ./tokencanvas-output
+```
+
+启动本机 Web UI：
+
+```bash
+tokencanvas web
+```
+
+默认地址是 `http://127.0.0.1:4174`。npm 的 Web UI 模式使用已打包静态资源，不需要克隆仓库或启动 Vite dev server。
+
 ## 终端模式
 
 TokenCanvas 也提供独立的终端工作台。终端模式使用自己的配置和历史，不读取或写入浏览器 localStorage、IndexedDB、浏览器历史或预设。
@@ -121,6 +149,31 @@ TOKENCANVAS_CONFIG_DIR=.tokencanvas-tmp pnpm cli
 
 终端图片预览是渐进增强能力。支持的终端可以显示内联预览；不支持时生成仍然成功，命令会输出本地图片路径作为可靠结果。
 
+## Cloudflare 部署
+
+Cloudflare 部署使用 Workers static assets：Worker 托管 Web UI 静态资源，并用 `/api/openai/*` 代理模型列表、图片生成和图片编辑请求。
+
+部署前需要配置 Worker secrets：
+
+```bash
+pnpm exec wrangler secret put OPENAI_API_KEY
+pnpm exec wrangler secret put TOKENCANVAS_PROXY_TOKEN
+```
+
+本地只构建验证：
+
+```bash
+pnpm run build:cloudflare
+```
+
+真实部署：
+
+```bash
+pnpm run deploy:cloudflare
+```
+
+公开部署时必须保护 `/api/openai/*`，因为 Worker 持有服务端 OpenAI API key。最低要求是 `TOKENCANVAS_PROXY_TOKEN`；更高强度访问控制应使用 Cloudflare Access / Zero Trust。详细步骤见 `docs/deployment/cloudflare.md`。
+
 ## 使用路径
 
 1. 打开页面后填写 OpenAI API key 和图片模型。
@@ -137,14 +190,18 @@ TokenCanvas 当前按个人本地工具设计：
 - OpenAI API key 只保存在当前浏览器本地
 - 历史记录和预设也只保存在当前浏览器
 - 终端模式的 API key、默认参数和最近历史保存在独立的终端配置目录
-- 首发形态不提供服务端代理、云端同步或多人权限控制
-- 如果要公开部署，应先补充后端代理和服务端密钥管理
+- Cloudflare 托管模式的 OpenAI API key 保存在 Worker secret 中，浏览器只保存部署访问 token
+- 当前不提供云端历史同步、多人账号、团队权限或远程任务队列
+- 如果公开部署，应额外使用 Cloudflare Access / Zero Trust 保护入口
 
 ## 常用命令
 
 ```bash
 pnpm cli
 pnpm cli -- generate --prompt "..." --output-dir ./tokencanvas-output
+pnpm run build:cloudflare
+pnpm run build:package
+pnpm run package:smoke
 pnpm test
 pnpm run typecheck:node
 pnpm run build
@@ -172,6 +229,7 @@ src/features/results/  # 当前结果、预览、下载和复用
 src/features/history/  # 本地历史记录
 src/features/presets/  # 本地预设模板
 src/cli/               # 终端 TUI、直接生成命令、终端配置和历史
+src/worker/            # Cloudflare Worker 入口和 OpenAI 代理
 src/lib/openai/        # AI SDK 图片生成请求层
 src/lib/storage/       # 本地持久化
 ```
