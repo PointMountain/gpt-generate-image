@@ -1,6 +1,6 @@
 # Cloudflare Deployment
 
-TokenCanvas 的 Cloudflare 形态只托管静态 Web UI。用户在浏览器页面里填写自己的 OpenAI API key 和 baseURL；Cloudflare 不保存 OpenAI key，也不代理 `/api/openai/*` 请求。
+TokenCanvas 的 Cloudflare 形态托管 Web UI，并提供同源 `/api/openai/*` 转发层。用户在浏览器页面里填写自己的 OpenAI API key 和 baseURL；Cloudflare 不保存服务端 OpenAI key，只把当前请求里的用户 key 转发到用户填写的 OpenAI 兼容端点。
 
 ## Cloudflare Form
 
@@ -15,7 +15,7 @@ Build output directory: dist
 Node.js version: 22
 ```
 
-不要在 Cloudflare 环境变量里配置 `OPENAI_API_KEY` 或 `TOKENCANVAS_PROXY_TOKEN`。这两个值不属于静态部署运行时。
+不要在 Cloudflare 环境变量里配置 `OPENAI_API_KEY` 或 `TOKENCANVAS_PROXY_TOKEN`。这两个值不属于当前部署运行时；API key 由用户在页面里填写。
 
 ## GitHub Actions
 
@@ -30,9 +30,11 @@ pnpm install
 pnpm test
 pnpm run typecheck:node
 pnpm run build
+pnpm exec wrangler deploy --dry-run
 ```
 
-`pnpm run build` 只生成静态 Web UI 到 `dist/`，不会部署。
+`pnpm run build` 会生成 Web UI 静态资源到 `dist/`，不会部署。
+`pnpm exec wrangler deploy --dry-run` 只验证 Worker 和 assets 能被 Cloudflare 打包，不会发布线上版本。
 
 ## Deploy
 
@@ -44,9 +46,11 @@ pnpm run deploy:cloudflare
 
 ## Runtime Behavior
 
-- 静态 Web UI 由 Cloudflare assets binding 服务。
+- Web UI 静态资源由 Cloudflare assets binding 服务。
 - 未命中的 Web UI 路径按 SPA fallback 返回 `index.html`。
 - 用户的 OpenAI API key、baseURL、历史记录和预设只保存在当前浏览器本地。
-- Cloudflare 不持有服务端 OpenAI API key，也不会提供 OpenAI 代理 API。
+- `/api/openai/models`、`/api/openai/images/generations` 和 `/api/openai/images/edits` 由 Worker 同源转发到用户填写的 `x-openai-base-url`，用于绕过浏览器 CORS 限制。
+- Worker 只允许 HTTPS baseURL，并拒绝 localhost、内网地址和非图片工作流相关路径。
+- Cloudflare 不持有服务端 OpenAI API key，也不会替用户保存 OpenAI 凭据。
 
-如果公开部署给多人使用，应在页面入口外层使用 Cloudflare Access / Zero Trust 控制访问范围；这只保护页面访问，不替用户保存或代理 OpenAI 凭据。
+如果公开部署给多人使用，应在页面入口外层使用 Cloudflare Access / Zero Trust 控制访问范围；这只保护页面访问，不替用户保存 OpenAI 凭据。

@@ -48,10 +48,11 @@ export function shouldUseOpenAIDevProxy(
   hostname = readBrowserHostname(),
   useProxy = false,
 ) {
-  return isLocalBrowserHost(hostname) && (
-    normalizeOpenAIBaseURL(baseURL) !== DEFAULT_OPENAI_BASE_URL ||
-    useProxy
-  );
+  if (useProxy) {
+    return true;
+  }
+
+  return isLocalBrowserHost(hostname) && normalizeOpenAIBaseURL(baseURL) !== DEFAULT_OPENAI_BASE_URL;
 }
 
 export function createOpenAIDevProxyFetch(baseURL: string, useProxy = false): typeof fetch {

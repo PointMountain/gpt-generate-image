@@ -27,7 +27,7 @@ export function createDefaultOpenAISettings(
   return {
     apiKey: '',
     baseURL: 'https://api.openai.com/v1',
-    useProxy: false,
+    useProxy: true,
     model: 'gpt-image-1',
     timeoutSeconds: 180,
     defaultSize: '1024x1024',

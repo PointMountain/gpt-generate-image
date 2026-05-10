@@ -91,6 +91,7 @@ export function OpenAISettingsPanel({
             <input
               id="openai-api-key"
               type="password"
+              autoComplete="off"
               value={settings.apiKey}
               onChange={(event) => updateField('apiKey', event.target.value)}
               placeholder="sk-..."
@@ -179,7 +180,7 @@ export function OpenAISettingsPanel({
         <summary>
           <span>
             高级连接设置
-            <small>保留给本地调试。正常使用 OpenAI 官方接口时无需修改。</small>
+            <small>默认使用同源代理，避免浏览器跨域限制。</small>
           </span>
         </summary>
 
@@ -188,12 +189,13 @@ export function OpenAISettingsPanel({
             <label htmlFor="openai-base-url">baseURL</label>
             <input
               id="openai-base-url"
+              autoComplete="url"
               value={settings.baseURL}
               onChange={(event) => updateField('baseURL', event.target.value)}
               placeholder="https://api.openai.com/v1"
             />
             {errors.baseURL ? <span className="field__error">{errors.baseURL}</span> : null}
-            <span className="field__hint">默认使用 OpenAI 官方地址；本地测试可填受信任端点。</span>
+            <span className="field__hint">默认使用 OpenAI 官方地址；兼容端点需要支持 OpenAI 图片接口。</span>
           </div>
 
           <div className="field">
@@ -215,9 +217,9 @@ export function OpenAISettingsPanel({
               checked={settings.useProxy}
               onChange={(event) => updateField('useProxy', event.target.checked)}
             />
-            <span>使用本机环境代理</span>
+            <span>使用同源请求代理</span>
           </label>
-          <span className="field__hint">默认关闭。开启后本地 dev proxy 会继承 HTTP_PROXY/HTTPS_PROXY/ALL_PROXY。</span>
+          <span className="field__hint">默认开启。Cloudflare 会转发你在页面填写的 key 和 baseURL，不保存服务端密钥；本地 dev proxy 会继承 HTTP_PROXY/HTTPS_PROXY/ALL_PROXY。</span>
         </div>
       </details>
     </div>

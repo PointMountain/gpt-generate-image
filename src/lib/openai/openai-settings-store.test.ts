@@ -38,15 +38,16 @@ describe('openai-settings-store', () => {
     expect(loadOpenAISettings()).toMatchObject({
       model: 'gpt-image-1',
       timeoutSeconds: 180,
-      useProxy: false,
+      useProxy: true,
       needsReconfiguration: true,
     });
   });
 
-  it('keeps static builds in browser API key mode', () => {
+  it('keeps static builds in browser API key mode with same-origin proxy enabled', () => {
     expect(createDefaultOpenAISettings()).toMatchObject({
       apiKey: '',
       baseURL: 'https://api.openai.com/v1',
+      useProxy: true,
     });
   });
 
@@ -80,7 +81,7 @@ describe('openai-settings-store', () => {
       baseURL: 'https://api.openai.com/v1',
       model: 'gpt-image-2',
       timeoutSeconds: 180,
-      useProxy: false,
+      useProxy: true,
       defaultSize: '1024x1024',
       defaultOutputFormat: 'auto',
       defaultBackground: 'transparent',

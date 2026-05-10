@@ -128,7 +128,7 @@ describe('model-discovery', () => {
     });
   });
 
-  it('routes custom HTTPS endpoints through the local dev proxy when requested', async () => {
+  it('routes custom HTTPS endpoints through the same-origin proxy when requested', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       data: [{ id: 'gpt-image-2', object: 'model', owned_by: 'openai' }],
     }), { status: 200 }));
@@ -146,6 +146,6 @@ describe('model-discovery', () => {
     }));
     const headers = fetchMock.mock.calls[0]?.[1]?.headers as Headers;
     expect(headers.get('x-openai-base-url')).toBe('https://example.com/v1');
-    expect(headers.get('x-openai-use-proxy')).toBe('false');
+    expect(headers.get('x-openai-use-proxy')).toBe('true');
   });
 });

@@ -4,14 +4,32 @@ import { App } from './app/App';
 import './styles/tokens.css';
 import './styles/global.css';
 
+function clearRestoredFormFocus() {
+  const activeElement = document.activeElement;
+  if (
+    activeElement instanceof HTMLInputElement ||
+    activeElement instanceof HTMLTextAreaElement ||
+    activeElement instanceof HTMLSelectElement
+  ) {
+    activeElement.blur();
+  }
+}
+
 function resetInitialScroll() {
   if ('scrollRestoration' in window.history) {
     window.history.scrollRestoration = 'manual';
   }
 
+  clearRestoredFormFocus();
   window.scrollTo(0, 0);
-  window.requestAnimationFrame(() => window.scrollTo(0, 0));
-  window.setTimeout(() => window.scrollTo(0, 0), 120);
+  window.requestAnimationFrame(() => {
+    clearRestoredFormFocus();
+    window.scrollTo(0, 0);
+  });
+  window.setTimeout(() => {
+    clearRestoredFormFocus();
+    window.scrollTo(0, 0);
+  }, 120);
 }
 
 resetInitialScroll();

@@ -16,6 +16,9 @@ export function PromptEditor({
         </div>
         <textarea
           id="prompt-textarea"
+          lang="zh-CN"
+          autoComplete="off"
+          spellCheck={false}
           value={prompt}
           onChange={(event) => onChangePrompt(event.target.value)}
           placeholder="暮色中的海边温室，湿润玻璃，电影灯光，细节丰富，低饱和胶片感"

@@ -1,3 +1,5 @@
+import { handleOpenAIUserProxyRequest } from './openai-user-proxy';
+
 export interface TokenCanvasWorkerEnv {
   ASSETS?: {
     fetch(request: Request): Promise<Response> | Response;
@@ -15,6 +17,11 @@ export async function handleTokenCanvasWorkerRequest(
   request: Request,
   env: TokenCanvasWorkerEnv,
 ): Promise<Response> {
+  const url = new URL(request.url);
+  if (url.pathname.startsWith('/api/openai/')) {
+    return handleOpenAIUserProxyRequest(request);
+  }
+
   if (!env.ASSETS) {
     return missingAssetsResponse();
   }

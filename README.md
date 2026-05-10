@@ -151,7 +151,7 @@ TOKENCANVAS_CONFIG_DIR=.tokencanvas-tmp pnpm cli
 
 ## Cloudflare 部署
 
-Cloudflare 部署只托管静态 Web UI。用户在页面里填写自己的 OpenAI API key 和 baseURL，凭据只保存在当前浏览器本地；Cloudflare 不保存 OpenAI key，也不代理 OpenAI 请求。
+Cloudflare 部署托管 Web UI，并提供同源 `/api/openai/*` 转发层解决浏览器 CORS。用户在页面里填写自己的 OpenAI API key 和 baseURL，凭据只保存在当前浏览器本地；Cloudflare 不保存服务端 OpenAI key。
 
 本地只构建验证：
 
@@ -193,7 +193,7 @@ TokenCanvas 当前按个人本地工具设计：
 - OpenAI API key 只保存在当前浏览器本地
 - 历史记录和预设也只保存在当前浏览器
 - 终端模式的 API key、默认参数和最近历史保存在独立的终端配置目录
-- Cloudflare 托管的 Web UI 也是静态页面模式，仍由用户在浏览器本地保存 OpenAI API key 和 baseURL
+- Cloudflare 托管的 Web UI 由用户在浏览器本地保存 OpenAI API key 和 baseURL，同源 Worker 只转发当前请求
 - 当前不提供云端历史同步、多人账号、团队权限或远程任务队列
 - 如果公开部署，应额外使用 Cloudflare Access / Zero Trust 保护页面入口
 
@@ -249,7 +249,6 @@ src/lib/storage/       # 本地持久化
 
 ## 后续方向
 
-- 后端 API route 代理和服务端密钥管理
 - 内置 mask 绘制器
 - Responses API 多轮图片工作流
 - 更丰富的结果筛选与批量复用
