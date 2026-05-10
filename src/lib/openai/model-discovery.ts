@@ -259,7 +259,13 @@ export async function fetchOpenAIImageModels(
   deps: FetchOpenAIImageModelsDeps = {},
 ): Promise<ModelDiscoveryResult> {
   const fetcher = deps.fetcher ?? createProxyAwareFetch(settings.useProxy);
-  const target = resolveOpenAIModelsRequestTarget(settings.baseURL, deps.hostname, settings.useProxy);
+  const target = resolveOpenAIModelsRequestTarget(
+    settings.baseURL,
+    deps.hostname,
+    settings.useProxy,
+    settings.hostedProxy,
+    settings.proxyAccessToken,
+  );
   if (!target.ok) {
     return {
       ok: false,
@@ -270,9 +276,12 @@ export async function fetchOpenAIImageModels(
   }
 
   const timeout = createTimeoutController(settings.timeoutSeconds, deps.abortSignal);
-  const headers = new Headers({
-    Authorization: `Bearer ${settings.apiKey}`,
-  });
+  const headers = new Headers();
+  if (settings.hostedProxy) {
+    headers.set('x-tokencanvas-proxy-token', target.proxyAccessTokenHeader);
+  } else {
+    headers.set('Authorization', `Bearer ${settings.apiKey}`);
+  }
 
   if (target.baseURLHeader) {
     headers.set('x-openai-base-url', target.baseURLHeader);

@@ -19,5 +19,5 @@
     "baseUrl": "."
   },
   "include": ["src"],
-  "exclude": ["src/cli", "src/lib/openai/node-image-output.ts"]
+  "exclude": ["src/cli", "src/worker", "src/lib/openai/node-image-output.ts"]
 }

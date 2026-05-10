@@ -71,7 +71,40 @@ export function createOpenAIDevProxyFetch(baseURL: string, useProxy = false): ty
   };
 }
 
-export function resolveOpenAIModelsRequestTarget(baseURL: string, hostname = readBrowserHostname(), useProxy = false) {
+export function createOpenAIHostedProxyFetch(proxyAccessToken: string): typeof fetch {
+  return (input, init) => {
+    const targetUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const proxiedUrl = targetUrl.replace(/^https:\/\/api\.openai\.com\/v1/i, '/api/openai');
+    const headers = new Headers(init?.headers);
+    headers.set('x-tokencanvas-proxy-token', proxyAccessToken);
+    headers.delete('authorization');
+
+    return fetch(proxiedUrl, {
+      ...init,
+      headers,
+    });
+  };
+}
+
+export function resolveOpenAIModelsRequestTarget(
+  baseURL: string,
+  hostname = readBrowserHostname(),
+  useProxy = false,
+  hostedProxy = false,
+  proxyAccessToken = '',
+) {
+  if (hostedProxy) {
+    return {
+      ok: true as const,
+      url: '/api/openai/models',
+      normalizedBaseURL: DEFAULT_OPENAI_BASE_URL,
+      baseURLHeader: '',
+      useProxyHeader: '',
+      proxyAccessTokenHeader: proxyAccessToken,
+      hostedProxy: true,
+    };
+  }
+
   const validation = validateOpenAIBaseURL(baseURL);
   if (!validation.ok) {
     return validation;
@@ -84,6 +117,8 @@ export function resolveOpenAIModelsRequestTarget(baseURL: string, hostname = rea
       normalizedBaseURL: validation.normalizedBaseURL,
       baseURLHeader: validation.normalizedBaseURL,
       useProxyHeader: useProxy ? 'true' : 'false',
+      proxyAccessTokenHeader: '',
+      hostedProxy: false,
     };
   }
 
@@ -93,10 +128,27 @@ export function resolveOpenAIModelsRequestTarget(baseURL: string, hostname = rea
     normalizedBaseURL: validation.normalizedBaseURL,
     baseURLHeader: '',
     useProxyHeader: '',
+    proxyAccessTokenHeader: '',
+    hostedProxy: false,
   };
 }
 
-export function resolveOpenAIProviderTransport(baseURL: string, hostname = readBrowserHostname(), useProxy = false) {
+export function resolveOpenAIProviderTransport(
+  baseURL: string,
+  hostname = readBrowserHostname(),
+  useProxy = false,
+  hostedProxy = false,
+  proxyAccessToken = '',
+) {
+  if (hostedProxy) {
+    return {
+      ok: true as const,
+      normalizedBaseURL: DEFAULT_OPENAI_BASE_URL,
+      baseURL: undefined,
+      fetch: createOpenAIHostedProxyFetch(proxyAccessToken),
+    };
+  }
+
   const validation = validateOpenAIBaseURL(baseURL);
   if (!validation.ok) {
     return validation;

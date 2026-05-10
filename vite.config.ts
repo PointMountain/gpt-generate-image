@@ -1,10 +1,14 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import { cloudflare } from '@cloudflare/vite-plugin';
 import { handleOpenAIProxy } from './src/lib/openai/openai-dev-proxy';
+
+const isCloudflareBuild = process.env.TOKENCANVAS_CLOUDFLARE === 'true';
 
 export default defineConfig({
   plugins: [
     react(),
+    ...(isCloudflareBuild ? cloudflare() : []),
     {
       name: 'openai-dev-proxy',
       configureServer(server) {

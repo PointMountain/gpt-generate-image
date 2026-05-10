@@ -19,6 +19,8 @@ export interface OpenAIImageSettings {
   apiKey: string;
   baseURL: string;
   useProxy: boolean;
+  hostedProxy: boolean;
+  proxyAccessToken: string;
   model: string;
   timeoutSeconds: number;
   defaultSize: string;
@@ -244,7 +246,13 @@ export async function generateOpenAIImages(
   options: { abortSignal?: AbortSignal } = {},
   deps: GenerateOpenAIImagesDeps = {},
 ): Promise<ClientResult> {
-  const transport = resolveOpenAIProviderTransport(settings.baseURL, undefined, settings.useProxy);
+  const transport = resolveOpenAIProviderTransport(
+    settings.baseURL,
+    undefined,
+    settings.useProxy,
+    settings.hostedProxy,
+    settings.proxyAccessToken,
+  );
   if (!transport.ok) {
     return {
       ok: false,
@@ -255,7 +263,7 @@ export async function generateOpenAIImages(
   }
 
   const openai = (deps.createOpenAIProvider ?? createOpenAI)({
-    apiKey: settings.apiKey,
+    apiKey: settings.hostedProxy ? 'hosted-proxy' : settings.apiKey,
     baseURL: transport.baseURL,
     fetch: transport.fetch,
   });

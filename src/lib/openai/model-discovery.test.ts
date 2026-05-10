@@ -148,4 +148,28 @@ describe('model-discovery', () => {
     expect(headers.get('x-openai-base-url')).toBe('https://example.com/v1');
     expect(headers.get('x-openai-use-proxy')).toBe('false');
   });
+
+  it('uses hosted proxy token instead of browser OpenAI authorization in hosted mode', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: [{ id: 'gpt-image-2', object: 'model', owned_by: 'openai' }],
+    }), { status: 200 }));
+
+    await fetchOpenAIImageModels(
+      createDefaultOpenAISettings({
+        hostedProxy: true,
+        proxyAccessToken: 'deploy-token',
+        apiKey: '',
+        baseURL: 'http://invalid.local/v1',
+      }),
+      { fetcher: fetchMock, hostname: 'token-canvas.example' },
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/openai/models', expect.objectContaining({
+      method: 'GET',
+      headers: expect.any(Headers),
+    }));
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Headers;
+    expect(headers.get('authorization')).toBeNull();
+    expect(headers.get('x-tokencanvas-proxy-token')).toBe('deploy-token');
+  });
 });

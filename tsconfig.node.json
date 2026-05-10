@@ -16,6 +16,7 @@
     "vite.config.ts",
     "src/cli/**/*.ts",
     "src/cli/**/*.tsx",
+    "src/worker/**/*.ts",
     "src/lib/openai/ai-sdk-image-client.ts",
     "src/lib/openai/image-file-adapter.ts",
     "src/lib/openai/node-image-output.ts",
