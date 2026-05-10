@@ -8,9 +8,11 @@ interface SelectOption {
 
 interface ConfirmableSelectProps {
   options: SelectOption[];
+  value?: string;
   defaultValue?: string;
   visibleOptionCount?: number;
   isDisabled?: boolean;
+  onHighlightChange?: (value: string, index: number) => void;
   onSubmit: (value: string) => void;
 }
 
@@ -34,16 +36,40 @@ function visibleRange(activeIndex: number, optionCount: number, visibleOptionCou
 
 export function ConfirmableSelect({
   options,
+  value,
   defaultValue,
   visibleOptionCount = 6,
   isDisabled = false,
+  onHighlightChange,
   onSubmit,
 }: ConfirmableSelectProps) {
-  const [activeIndex, setActiveIndex] = useState(() => selectedIndexFor(options, defaultValue));
+  const isControlled = value !== undefined;
+  const [activeIndexState, setActiveIndexState] = useState(() => selectedIndexFor(options, value ?? defaultValue));
+  const activeIndex = isControlled
+    ? selectedIndexFor(options, value)
+    : activeIndexState;
+  const selectedValue = value ?? defaultValue;
 
   useEffect(() => {
-    setActiveIndex(selectedIndexFor(options, defaultValue));
-  }, [defaultValue, options]);
+    if (!isControlled) {
+      setActiveIndexState(selectedIndexFor(options, defaultValue));
+    }
+  }, [defaultValue, isControlled, options]);
+
+  function moveActiveIndex(nextIndex: number) {
+    const normalizedIndex = ((nextIndex % options.length) + options.length) % options.length;
+    const nextValue = options[normalizedIndex]?.value;
+
+    if (!nextValue) {
+      return;
+    }
+
+    if (!isControlled) {
+      setActiveIndexState(normalizedIndex);
+    }
+
+    onHighlightChange?.(nextValue, normalizedIndex);
+  }
 
   useInput((_input, key) => {
     if (isDisabled || options.length === 0) {
@@ -51,12 +77,12 @@ export function ConfirmableSelect({
     }
 
     if (key.downArrow) {
-      setActiveIndex((current) => (current + 1) % options.length);
+      moveActiveIndex(activeIndex + 1);
       return;
     }
 
     if (key.upArrow) {
-      setActiveIndex((current) => (current - 1 + options.length) % options.length);
+      moveActiveIndex(activeIndex - 1);
       return;
     }
 
@@ -74,7 +100,7 @@ export function ConfirmableSelect({
       {options.slice(start, end).map((option, offset) => {
         const index = start + offset;
         const isActive = index === activeIndex;
-        const isSelected = option.value === defaultValue;
+        const isSelected = option.value === selectedValue;
 
         return (
           <Box key={option.value}>

@@ -16,6 +16,12 @@ const commands: SlashCommandDefinition[] = [
   { name: '/generate', syntax: '/generate [prompt]', description: '开始生成' },
 ];
 
+async function waitForInput() {
+  await new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
+
 describe('CommandInput', () => {
   it('shows matching commands and exposes tab completion behavior', () => {
     const onSubmit = vi.fn();
@@ -70,5 +76,38 @@ describe('CommandInput', () => {
   it('removes only the current line for line-clear shortcuts', () => {
     expect(removeCurrentInputLine('海绵宝宝')).toBe('');
     expect(removeCurrentInputLine('第一行\n第二行')).toBe('第一行\n');
+  });
+
+  it('lets a lone slash be removed with terminal backspace input', async () => {
+    const onSubmit = vi.fn();
+    const { stdin, lastFrame } = render(<CommandInput commands={commands} onSubmit={onSubmit} />);
+
+    await waitForInput();
+    stdin.write('/');
+    await waitForInput();
+    expect(lastFrame()).toContain('/');
+
+    stdin.write('\u007f');
+    await waitForInput();
+
+    expect(lastFrame()).toContain('› █');
+    expect(lastFrame()).not.toContain('› /');
+    expect(lastFrame()).not.toContain('/mode');
+    expect(lastFrame()).not.toContain('/mask');
+  });
+
+  it('keeps command editing reversible after completion', async () => {
+    const onSubmit = vi.fn();
+    const { stdin, lastFrame } = render(<CommandInput commands={commands} initialValue="/mode " onSubmit={onSubmit} />);
+
+    await waitForInput();
+    expect(lastFrame()).toContain('[text|image|mask]');
+
+    stdin.write('\u007f');
+    await waitForInput();
+
+    expect(lastFrame()).toContain('/mode');
+    expect(lastFrame()).toContain('选择模式');
+    expect(lastFrame()).not.toContain('[text|image|mask]');
   });
 });

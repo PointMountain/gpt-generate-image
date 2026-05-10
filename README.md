@@ -101,7 +101,7 @@ TokenCanvas 也提供独立的终端工作台。终端模式使用自己的配�
 pnpm cli
 ```
 
-TUI 启动后是类似 Claude Code / Codex CLI 的 slash-command 工作区。底部输入框支持输入 `/` 后联想指令，输入一部分后按 Tab 补全当前候选；候选列表会高亮匹配到的指令，并显示语法和用途。常用指令：
+TUI 启动后是类似 Claude Code / Codex CLI 的 slash-command 工作区。底部输入框支持输入 `/` 后联想指令，输入一部分后按 Tab 补全当前候选；如果只是误触 `/`，直接按退格即可回到空输入。最近结果不再常驻在底部，而是通过 `/history` 打开结果列表，列表里用上下键选择，回车后尝试直接打开对应图片。常用指令：
 
 ```text
 /help                 查看全部指令和用法
@@ -119,6 +119,7 @@ TUI 启动后是类似 Claude Code / Codex CLI 的 slash-command 工作区。底
 /reference            输入参考图路径，多个路径用逗号分隔
 /mask                 输入 mask 图片路径
 /output               设置输出目录
+/history              打开最近结果列表，回车尝试打开选中图片
 /generate             开始生成，生成中会显示 loading
 ```
 
@@ -147,7 +148,7 @@ pnpm cli -- generate \
 TOKENCANVAS_CONFIG_DIR=.tokencanvas-tmp pnpm cli
 ```
 
-终端图片预览是渐进增强能力。支持的终端可以显示内联预览；不支持时生成仍然成功，命令会输出本地图片路径作为可靠结果。
+终端图片预览和自动打开都是渐进增强能力。支持的终端可以显示内联预览；支持图形打开命令的环境会在 `/history` 里直接打开选中图片；任一增强能力不可用时，生成仍然成功，命令会输出本地图片路径作为可靠结果。
 
 ## Cloudflare 部署
 

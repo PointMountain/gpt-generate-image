@@ -16,10 +16,14 @@ import { CommandInput, type SlashCommandDefinition } from '../components/command
 import { ConfirmableSelect } from '../components/confirmable-select';
 import { StatusPanel } from '../components/status-panel';
 import { MAX_GENERATION_COUNT } from '../../runtime/terminal-mode';
+import type { TerminalHistoryEntry } from '../../history/terminal-history-store';
+import { HistoryScreen } from './history-screen';
+import type { OpenHistoryFileResult } from '../../history/open-history-file';
 
 interface GenerationScreenProps {
   config: TerminalConfig;
   configPersistenceError?: string | null;
+  historyEntries: TerminalHistoryEntry[];
   isGenerating: boolean;
   result: GenerateCommandResult | null;
   onSaveConfig: (config: TerminalConfig) => Promise<ConfigPersistenceResult>;
@@ -30,6 +34,7 @@ interface GenerationScreenProps {
     mask?: string;
     count?: number;
   }) => void;
+  onOpenHistoryEntry: (entry: TerminalHistoryEntry) => Promise<OpenHistoryFileResult>;
 }
 
 type Panel =
@@ -42,6 +47,7 @@ type Panel =
   | 'prompt'
   | 'reference'
   | 'mask'
+  | 'history'
   | 'outputDir'
   | 'size'
   | 'quality'
@@ -67,6 +73,7 @@ const COMMANDS: SlashCommandDefinition[] = [
   { name: '/reference', syntax: '/reference [a.png,b.png]', description: '输入参考图路径' },
   { name: '/mask', syntax: '/mask [mask.png]', description: '输入 mask 图片路径' },
   { name: '/output', syntax: '/output [dir]', description: '设置输出目录' },
+  { name: '/history', syntax: '/history', description: '打开最近结果列表并回车打开图片' },
   { name: '/generate', syntax: '/generate [prompt]', description: '开始生成并显示 loading' },
   { name: '/clear', syntax: '/clear', description: '清空日志' },
 ];
@@ -104,10 +111,12 @@ function optionItems(options: Array<{ label: string; value: string }>) {
 export function GenerationScreen({
   config,
   configPersistenceError,
+  historyEntries,
   isGenerating,
   result,
   onSaveConfig,
   onGenerate,
+  onOpenHistoryEntry,
 }: GenerationScreenProps) {
   const [panel, setPanel] = useState<Panel>('console');
   const [draftConfig, setDraftConfig] = useState(config);
@@ -166,6 +175,12 @@ export function GenerationScreen({
 
   function openPanel(nextPanel: Panel) {
     setPanel(nextPanel);
+  }
+
+  async function handleOpenHistoryEntry(entry: TerminalHistoryEntry) {
+    const openResult = await onOpenHistoryEntry(entry);
+    pushLog(openResult.detail);
+    openPanel('console');
   }
 
   function runGenerate(nextPrompt = prompt) {
@@ -347,6 +362,9 @@ export function GenerationScreen({
         setIsConfigFlow(false);
         openPanel('outputDir');
         return;
+      case '/history':
+        openPanel('history');
+        return;
       case '/generate':
         if (rest) {
           setPrompt(rest);
@@ -401,6 +419,22 @@ export function GenerationScreen({
           </Box>
         ))}
       </Box>
+    );
+  }
+
+  function renderHistoryPanel() {
+    if (panel !== 'history') {
+      return null;
+    }
+
+    return (
+      <HistoryScreen
+        entries={historyEntries}
+        onClose={() => {
+          openPanel('console');
+        }}
+        onOpen={handleOpenHistoryEntry}
+      />
     );
   }
 
@@ -739,6 +773,7 @@ export function GenerationScreen({
       ) : null}
 
       {panel === 'help' ? renderHelp() : null}
+      {renderHistoryPanel()}
       {renderConfigInput()}
       {renderModeSelect()}
       {renderTextInputPanel()}

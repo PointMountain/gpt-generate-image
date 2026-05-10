@@ -14,6 +14,10 @@ interface CommandInputProps {
   onSubmit: (value: string) => void;
 }
 
+function isDeleteInput(input: string, key: { backspace?: boolean; delete?: boolean; ctrl?: boolean }) {
+  return key.backspace || key.delete || input === '\b' || input === '\u007f' || (key.ctrl && input === 'h');
+}
+
 function commandPart(value: string) {
   return value.trimStart().split(/\s+/)[0] ?? '';
 }
@@ -177,12 +181,12 @@ export function CommandInput({ commands, initialValue = '', isDisabled = false, 
       return;
     }
 
-    if ((key.meta && (key.backspace || key.delete)) || (key.ctrl && input === 'u')) {
+    if ((key.meta && isDeleteInput(input, key)) || (key.ctrl && input === 'u')) {
       setValue(removeCurrentInputLine);
       return;
     }
 
-    if (key.backspace || key.delete) {
+    if (isDeleteInput(input, key)) {
       setValue((current) => current.slice(0, -1));
       return;
     }

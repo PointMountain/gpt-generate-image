@@ -1,6 +1,6 @@
 {
   "name": "token-canvas",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local OpenAI image workbench with Web UI, TUI, and CLI modes.",
   "packageManager": "pnpm@10.0.0",
   "type": "module",
