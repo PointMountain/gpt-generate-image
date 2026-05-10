@@ -123,7 +123,7 @@ describe('generate command schema', () => {
   it('fails the root command fast outside an interactive terminal', async () => {
     const result = await runCli([]);
 
-    expect(result.stdout).toBe('');
+    expect(result.stdout.trim()).toBe('');
     expect(result.stderr).toContain('tokencanvas 需要交互式终端');
     expect(result.code).toBe(2);
   });

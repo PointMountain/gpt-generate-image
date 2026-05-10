@@ -85,14 +85,26 @@ describe('worker openai proxy', () => {
       status: 200,
       headers: { 'content-type': 'application/json' },
     }));
-    const body = new FormData();
-    body.set('prompt', 'clean icon');
-    body.set('image', new Blob(['image-bytes'], { type: 'image/png' }), 'image.png');
+    const body = [
+      '--tokencanvas-boundary',
+      'Content-Disposition: form-data; name="prompt"',
+      '',
+      'clean icon',
+      '--tokencanvas-boundary',
+      'Content-Disposition: form-data; name="image"; filename="image.png"',
+      'Content-Type: image/png',
+      '',
+      'image-bytes',
+      '--tokencanvas-boundary--',
+    ].join('\r\n');
 
     const response = await handleWorkerOpenAIProxy(
       createRequest('/api/openai/images/edits', {
         method: 'POST',
         body,
+        headers: {
+          'content-type': 'multipart/form-data; boundary=tokencanvas-boundary',
+        },
       }),
       env,
       { fetcher },
