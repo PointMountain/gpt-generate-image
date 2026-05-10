@@ -254,17 +254,12 @@ a {
 }
 
 .studio-command-bar__mark {
-  display: inline-grid;
-  place-items: center;
+  display: block;
   width: 46px;
   height: 46px;
   flex: 0 0 auto;
   border-radius: var(--radius-md);
-  background: var(--text-strong);
-  color: #ffffff;
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
-  font-weight: 800;
+  object-fit: cover;
 }
 
 .studio-command-bar p,

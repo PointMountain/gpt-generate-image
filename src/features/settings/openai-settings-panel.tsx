@@ -55,9 +55,9 @@ export function OpenAISettingsPanel({
       <div className="surface-header surface-header--tight">
         <div>
           <h2>OpenAI 设置</h2>
-          <p>{settings.hostedProxy ? '填写部署访问 token 和模型后，就可以通过 Cloudflare Worker 生成图片。' : '保存 API key 和模型后，就可以在创作区直接生成图片。'}</p>
+          <p>保存 API key、baseURL 和模型后，就可以在创作区直接生成图片。</p>
         </div>
-        <span className="surface-header__badge">{settings.hostedProxy ? 'Cloudflare Worker 代理' : '本地浏览器保存'}</span>
+        <span className="surface-header__badge">本地浏览器保存</span>
       </div>
 
       {settings.needsReconfiguration ? (
@@ -72,50 +72,31 @@ export function OpenAISettingsPanel({
           <p className="section-heading__eyebrow">Connection</p>
           <h3>{settings.model || 'gpt-image-1'}</h3>
           <p>
-            {settings.hostedProxy
-              ? settings.proxyAccessToken
-                ? '部署访问 token 已填写，可以通过 Worker 生成。'
-                : '填写部署访问 token 后即可调用 Worker 代理。'
-              : settings.apiKey
-                ? 'OpenAI key 已填写，可以生成。'
-                : '填写 OpenAI API key 后即可生成图片。'}
+            {settings.apiKey
+              ? 'OpenAI key 已填写，可以生成。'
+              : '填写 OpenAI API key 后即可生成图片。'}
           </p>
         </div>
         <div className="provider-status-card__badges">
           <span className="provider-tag">OpenAI</span>
           <span className="provider-tag">{settings.timeoutSeconds}s</span>
-          <span className="provider-tag">{settings.hostedProxy ? 'hosted proxy' : `代理 ${settings.useProxy ? 'on' : 'off'}`}</span>
+          <span className="provider-tag">{`代理 ${settings.useProxy ? 'on' : 'off'}`}</span>
         </div>
       </div>
 
       <div className="section-card section-card--flat">
         <div className="field-grid">
-          {settings.hostedProxy ? (
-            <div className="field">
-              <label htmlFor="openai-proxy-access-token">部署访问 token</label>
-              <input
-                id="openai-proxy-access-token"
-                type="password"
-                value={settings.proxyAccessToken}
-                onChange={(event) => updateField('proxyAccessToken', event.target.value)}
-                placeholder="token..."
-              />
-              {errors.proxyAccessToken ? <span className="field__error">{errors.proxyAccessToken}</span> : null}
-              <span className="field__hint">此 token 只用于访问你的 Cloudflare Worker 代理，不是 OpenAI API key。</span>
-            </div>
-          ) : (
-            <div className="field">
-              <label htmlFor="openai-api-key">OpenAI API key</label>
-              <input
-                id="openai-api-key"
-                type="password"
-                value={settings.apiKey}
-                onChange={(event) => updateField('apiKey', event.target.value)}
-                placeholder="sk-..."
-              />
-              {errors.apiKey ? <span className="field__error">{errors.apiKey}</span> : null}
-            </div>
-          )}
+          <div className="field">
+            <label htmlFor="openai-api-key">OpenAI API key</label>
+            <input
+              id="openai-api-key"
+              type="password"
+              value={settings.apiKey}
+              onChange={(event) => updateField('apiKey', event.target.value)}
+              placeholder="sk-..."
+            />
+            {errors.apiKey ? <span className="field__error">{errors.apiKey}</span> : null}
+          </div>
         </div>
 
         <ModelPicker
@@ -124,7 +105,7 @@ export function OpenAISettingsPanel({
           status={modelDiscovery.status}
           error={modelDiscovery.error}
           fetchedAt={modelDiscovery.fetchedAt}
-          canFetchModels={settings.hostedProxy ? Boolean(settings.proxyAccessToken.trim()) : Boolean(settings.apiKey.trim())}
+          canFetchModels={Boolean(settings.apiKey.trim())}
           onFetchModels={onFetchModels}
           onChange={(modelId) => updateField('model', modelId)}
           validationError={errors.model}
@@ -132,7 +113,7 @@ export function OpenAISettingsPanel({
 
         <div className="button-row top-gap">
           <button className="button button--primary" type="button" onClick={onSave}>
-            {settings.hostedProxy ? '保存部署设置' : '保存 OpenAI 设置'}
+            保存 OpenAI 设置
           </button>
         </div>
       </div>
@@ -194,8 +175,7 @@ export function OpenAISettingsPanel({
         </div>
       </div>
 
-      {!settings.hostedProxy ? (
-        <details className="settings-disclosure">
+      <details className="settings-disclosure">
         <summary>
           <span>
             高级连接设置
@@ -240,7 +220,6 @@ export function OpenAISettingsPanel({
           <span className="field__hint">默认关闭。开启后本地 dev proxy 会继承 HTTP_PROXY/HTTPS_PROXY/ALL_PROXY。</span>
         </div>
       </details>
-      ) : null}
     </div>
   );
 }

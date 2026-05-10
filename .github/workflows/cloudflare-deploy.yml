@@ -55,8 +55,8 @@ jobs:
       - name: Package smoke
         run: pnpm run package:smoke
 
-      - name: Build Cloudflare Worker
-        run: pnpm run build:cloudflare
+      - name: Build Cloudflare static site
+        run: pnpm run build
 
       - name: Deploy to Cloudflare
         if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'

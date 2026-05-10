@@ -1,13 +1,7 @@
-import { handleWorkerOpenAIProxy, type WorkerOpenAIProxyEnv } from './openai-proxy';
-
-export interface TokenCanvasWorkerEnv extends WorkerOpenAIProxyEnv {
+export interface TokenCanvasWorkerEnv {
   ASSETS?: {
     fetch(request: Request): Promise<Response> | Response;
   };
-}
-
-function isOpenAIProxyRequest(request: Request) {
-  return new URL(request.url).pathname.startsWith('/api/openai/');
 }
 
 function missingAssetsResponse() {
@@ -21,10 +15,6 @@ export async function handleTokenCanvasWorkerRequest(
   request: Request,
   env: TokenCanvasWorkerEnv,
 ): Promise<Response> {
-  if (isOpenAIProxyRequest(request)) {
-    return handleWorkerOpenAIProxy(request, env);
-  }
-
   if (!env.ASSETS) {
     return missingAssetsResponse();
   }

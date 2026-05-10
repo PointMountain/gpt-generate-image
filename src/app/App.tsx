@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AppShell } from '../components/layout/app-shell';
 import { WorkbenchFrame } from '../components/layout/workbench-frame';
 import { ToastRegion } from '../components/feedback/toast-region';
@@ -143,6 +143,23 @@ export function App() {
   const modelDiscoveryRequestIdRef = useRef(0);
   const latestFormRef = useRef(form);
 
+  useLayoutEffect(() => {
+    const canControlScrollRestoration = 'scrollRestoration' in window.history;
+    const previousScrollRestoration = canControlScrollRestoration ? window.history.scrollRestoration : undefined;
+
+    if (canControlScrollRestoration) {
+      window.history.scrollRestoration = 'manual';
+    }
+
+    window.scrollTo(0, 0);
+
+    return () => {
+      if (canControlScrollRestoration && previousScrollRestoration) {
+        window.history.scrollRestoration = previousScrollRestoration;
+      }
+    };
+  }, []);
+
   useEffect(() => {
     latestFormRef.current = form;
   }, [form]);
@@ -198,15 +215,15 @@ export function App() {
     }
 
     saveOpenAISettings(settings);
-    setToastMessage(settings.hostedProxy ? '部署访问设置已保存到当前浏览器。' : 'OpenAI 设置已保存到当前浏览器。');
+    setToastMessage('OpenAI 设置已保存到当前浏览器。');
   }
 
   async function handleFetchModels() {
     const validationErrors = validateOpenAISettings(settings);
     setSettingsErrors(validationErrors);
 
-    if (validationErrors.apiKey || validationErrors.proxyAccessToken || validationErrors.baseURL || validationErrors.timeoutSeconds) {
-      setToastMessage(validationErrors.apiKey || validationErrors.proxyAccessToken || validationErrors.baseURL || validationErrors.timeoutSeconds || '请先修正 OpenAI 设置。');
+    if (validationErrors.apiKey || validationErrors.baseURL || validationErrors.timeoutSeconds) {
+      setToastMessage(validationErrors.apiKey || validationErrors.baseURL || validationErrors.timeoutSeconds || '请先修正 OpenAI 设置。');
       return;
     }
 
@@ -259,8 +276,6 @@ export function App() {
   function handleSettingsChange(nextSettings: OpenAISettingsStoreState) {
     const shouldResetModelDiscovery = (
       settings.apiKey !== nextSettings.apiKey ||
-      settings.proxyAccessToken !== nextSettings.proxyAccessToken ||
-      settings.hostedProxy !== nextSettings.hostedProxy ||
       settings.baseURL !== nextSettings.baseURL
     );
 
@@ -354,11 +369,7 @@ export function App() {
   }
 
   function validateGenerationForm(nextForm: GenerationFormState) {
-    if (settings.hostedProxy) {
-      if (!settings.proxyAccessToken.trim()) {
-        return '请先填写并保存部署访问 token。';
-      }
-    } else if (!settings.apiKey.trim()) {
+    if (!settings.apiKey.trim()) {
       return '请先填写并保存 OpenAI API key。';
     }
 
@@ -569,7 +580,7 @@ export function App() {
         <span className="pill pill--muted">
           {settings.model ? `模型：${settings.model}` : '等待填写模型'}
         </span>
-        <span className="pill pill--muted">{settings.hostedProxy ? 'Cloudflare 代理' : `代理：${settings.useProxy ? 'on' : 'off'}`}</span>
+        <span className="pill pill--muted">{`代理：${settings.useProxy ? 'on' : 'off'}`}</span>
       </div>
     </>
   );
@@ -577,7 +588,7 @@ export function App() {
   const commandBar = (
     <div className="studio-command-bar" aria-label="OpenAI 创作控制条">
       <div className="studio-command-bar__identity">
-        <span className="studio-command-bar__mark">TC</span>
+        <img className="studio-command-bar__mark" src="/tokencanvas-hero.png" alt="" aria-hidden="true" />
         <div>
           <p>Provider</p>
           <strong>OpenAI Image API</strong>
@@ -603,21 +614,19 @@ export function App() {
         <div>
           <span>连接</span>
           <strong>
-            {settings.hostedProxy
-              ? settings.proxyAccessToken ? `${settings.timeoutSeconds}s timeout` : '等待部署 token'
-              : settings.apiKey ? `${settings.timeoutSeconds}s timeout` : '等待 API key'}
+            {settings.apiKey ? `${settings.timeoutSeconds}s timeout` : '等待 API key'}
           </strong>
         </div>
         <div>
           <span>代理</span>
-          <strong>{settings.hostedProxy ? 'hosted' : settings.useProxy ? 'on' : 'off'}</strong>
+          <strong>{settings.useProxy ? 'on' : 'off'}</strong>
         </div>
       </div>
       <div className="studio-command-bar__actions">
         <button
           className="button button--ghost"
           type="button"
-          disabled={(settings.hostedProxy ? !settings.proxyAccessToken.trim() : !settings.apiKey.trim()) || modelDiscovery.status === 'loading'}
+          disabled={!settings.apiKey.trim() || modelDiscovery.status === 'loading'}
           onClick={() => void handleFetchModels()}
         >
           {modelDiscovery.status === 'loading' ? '拉取中' : '拉取模型'}
@@ -671,7 +680,7 @@ export function App() {
       form={form}
       selectedModelLabel={settings.model}
       supportsReferenceImages
-      canGenerate={Boolean((settings.hostedProxy ? settings.proxyAccessToken : settings.apiKey) && settings.model && form.prompt.trim())}
+      canGenerate={Boolean(settings.apiKey && settings.model && form.prompt.trim())}
       isGenerating={isGenerating}
       onChangeForm={setForm}
       onGenerate={() => void handleGenerate()}
@@ -713,7 +722,7 @@ export function App() {
   return (
     <AppShell
       masthead={masthead}
-      footer={<p>{settings.hostedProxy ? 'Cloudflare 托管模式。OpenAI API key 保存在 Worker secret 中；浏览器只保存部署访问 token。' : '本地个人工作台。OpenAI API key 仅保存在当前浏览器；公开部署请改用后端代理。'}</p>}
+      footer={<p>OpenAI API key 和 baseURL 仅保存在当前浏览器。</p>}
     >
       <WorkbenchFrame
         commandBar={commandBar}

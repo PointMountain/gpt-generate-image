@@ -5,6 +5,8 @@ status: completed
 date: 2026-05-10
 ---
 
+> Update 2026-05-10: Cloudflare deployment has since been simplified to static Web UI hosting. Users now enter their own OpenAI API key and baseURL in the browser; Cloudflare no longer needs Worker OpenAI secrets or a hosted OpenAI proxy.
+
 # feat: Release TokenCanvas on Cloudflare and npm
 
 ## Summary

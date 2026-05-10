@@ -16,14 +16,9 @@ export interface OpenAISettingsStoreState extends OpenAIImageSettings {
 
 export interface OpenAISettingsValidationErrors {
   apiKey?: string;
-  proxyAccessToken?: string;
   baseURL?: string;
   model?: string;
   timeoutSeconds?: string;
-}
-
-function readHostedProxyDefault() {
-  return import.meta.env.VITE_TOKENCANVAS_HOSTED_PROXY === 'true';
 }
 
 export function createDefaultOpenAISettings(
@@ -33,8 +28,6 @@ export function createDefaultOpenAISettings(
     apiKey: '',
     baseURL: 'https://api.openai.com/v1',
     useProxy: false,
-    hostedProxy: readHostedProxyDefault(),
-    proxyAccessToken: '',
     model: 'gpt-image-1',
     timeoutSeconds: 180,
     defaultSize: '1024x1024',
@@ -83,8 +76,6 @@ function normalizeStoredSettings(stored: Partial<OpenAISettingsStoreState>) {
     apiKey: readString(stored.apiKey, defaults.apiKey),
     baseURL: readString(stored.baseURL, defaults.baseURL),
     useProxy: typeof stored.useProxy === 'boolean' ? stored.useProxy : defaults.useProxy,
-    hostedProxy: typeof stored.hostedProxy === 'boolean' ? stored.hostedProxy : defaults.hostedProxy,
-    proxyAccessToken: readString(stored.proxyAccessToken, defaults.proxyAccessToken),
     model: readString(stored.model, defaults.model),
     timeoutSeconds: readFiniteNumber(stored.timeoutSeconds, defaults.timeoutSeconds, 5),
     defaultSize: readEnum(stored.defaultSize, SIZE_VALUES, defaults.defaultSize),
@@ -124,11 +115,7 @@ export function saveOpenAISettings(settings: OpenAISettingsStoreState) {
 export function validateOpenAISettings(settings: OpenAISettingsStoreState) {
   const errors: OpenAISettingsValidationErrors = {};
 
-  if (settings.hostedProxy) {
-    if (!settings.proxyAccessToken.trim()) {
-      errors.proxyAccessToken = '部署访问 token 不能为空。';
-    }
-  } else if (!settings.apiKey.trim()) {
+  if (!settings.apiKey.trim()) {
     errors.apiKey = 'OpenAI API key 不能为空。';
   }
 
@@ -136,11 +123,9 @@ export function validateOpenAISettings(settings: OpenAISettingsStoreState) {
     errors.model = '模型不能为空，默认可使用 gpt-image-1 或兼容端点支持的 gpt-image-2。';
   }
 
-  if (!settings.hostedProxy) {
-    const baseURLValidation = validateOpenAIBaseURL(settings.baseURL);
-    if (!baseURLValidation.ok) {
-      errors.baseURL = baseURLValidation.message;
-    }
+  const baseURLValidation = validateOpenAIBaseURL(settings.baseURL);
+  if (!baseURLValidation.ok) {
+    errors.baseURL = baseURLValidation.message;
   }
 
   if (!Number.isFinite(settings.timeoutSeconds) || settings.timeoutSeconds < 5) {

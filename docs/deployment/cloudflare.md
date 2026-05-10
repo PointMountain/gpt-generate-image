@@ -1,20 +1,30 @@
 # Cloudflare Deployment
 
-TokenCanvas 的 Cloudflare 形态使用 Workers static assets：同一个 Worker 同时托管 Web UI 静态资源，并处理 `/api/openai/*` 代理。
+TokenCanvas 的 Cloudflare 形态只托管静态 Web UI。用户在浏览器页面里填写自己的 OpenAI API key 和 baseURL；Cloudflare 不保存 OpenAI key，也不代理 `/api/openai/*` 请求。
 
-## Required Secrets
+## Cloudflare Form
 
-在 Cloudflare Worker 上配置：
+在 Cloudflare 连接 GitHub 仓库创建应用时填写：
 
-- `OPENAI_API_KEY`: Worker 服务端调用 OpenAI 的 key。
-- `TOKENCANVAS_PROXY_TOKEN`: 浏览器访问 `/api/openai/*` 时必须提供的部署访问 token。
+```text
+Project name: token-canvas
+Build command: pnpm run build
+Deploy command: pnpm exec wrangler deploy
+Root directory: /
+Build output directory: dist
+Node.js version: 22
+```
 
-在 GitHub Actions repository secrets 中配置：
+不要在 Cloudflare 环境变量里配置 `OPENAI_API_KEY` 或 `TOKENCANVAS_PROXY_TOKEN`。这两个值不属于静态部署运行时。
+
+## GitHub Actions Secrets
+
+GitHub Actions 自动部署仍需要 Cloudflare 部署凭据：
 
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 
-不要把 OpenAI key、Cloudflare token 或部署访问 token 写进 `wrangler.jsonc`、`.env`、README 示例输出或 npm 包产物。
+这些 secret 只用于 `wrangler deploy` 鉴权，不会进入浏览器 bundle。
 
 ## Local Verification
 
@@ -22,27 +32,24 @@ TokenCanvas 的 Cloudflare 形态使用 Workers static assets：同一个 Worker
 pnpm install
 pnpm test
 pnpm run typecheck:node
-pnpm run build:cloudflare
+pnpm run build
 ```
 
-`pnpm run build:cloudflare` 只构建 Worker 和 Web UI，不会部署。
+`pnpm run build` 只生成静态 Web UI 到 `dist/`，不会部署。
 
 ## Deploy
 
 ```bash
-pnpm exec wrangler secret put OPENAI_API_KEY
-pnpm exec wrangler secret put TOKENCANVAS_PROXY_TOKEN
 pnpm run deploy:cloudflare
 ```
 
-`deploy:cloudflare` 会先执行 Cloudflare 构建，再调用 `wrangler deploy`。真实部署需要已登录 Wrangler 或提供 CI secrets。
+`deploy:cloudflare` 会先执行 `pnpm run build`，再调用 `wrangler deploy` 发布静态资源。真实部署需要已登录 Wrangler，或在 CI 中提供 Cloudflare 部署 secrets。
 
 ## Runtime Behavior
 
 - 静态 Web UI 由 Cloudflare assets binding 服务。
 - 未命中的 Web UI 路径按 SPA fallback 返回 `index.html`。
-- `/api/openai/models`、`/api/openai/images/generations` 和 `/api/openai/images/edits` 由 Worker 代理处理。
-- Worker 只读取服务端 `OPENAI_API_KEY` secret，不信任浏览器传入的 OpenAI Authorization。
-- 请求必须带 `x-tokencanvas-proxy-token`，或 `Authorization: Bearer <TOKENCANVAS_PROXY_TOKEN>`。
+- 用户的 OpenAI API key、baseURL、历史记录和预设只保存在当前浏览器本地。
+- Cloudflare 不持有服务端 OpenAI API key，也不会提供 OpenAI 代理 API。
 
-公开部署时，`TOKENCANVAS_PROXY_TOKEN` 是最低保护。更高强度的访问控制应在 Cloudflare Access / Zero Trust 中配置。
+如果公开部署给多人使用，应在页面入口外层使用 Cloudflare Access / Zero Trust 控制访问范围；这只保护页面访问，不替用户保存或代理 OpenAI 凭据。

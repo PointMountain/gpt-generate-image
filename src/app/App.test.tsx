@@ -23,6 +23,15 @@ vi.mock('../lib/openai/model-discovery', async (importOriginal) => {
 describe('App', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    Object.defineProperty(window, 'scrollTo', {
+      value: vi.fn(),
+      writable: true,
+    });
+    Object.defineProperty(window.history, 'scrollRestoration', {
+      value: 'auto',
+      writable: true,
+      configurable: true,
+    });
     vi.mocked(generateOpenAIImages).mockReset();
     vi.mocked(fetchOpenAIImageModels).mockReset();
   });
@@ -36,6 +45,18 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: '当前结果' })).toBeInTheDocument();
     expect(within(screen.getByLabelText('OpenAI 创作控制条')).getByText('代理')).toBeInTheDocument();
     expect(within(screen.getByLabelText('OpenAI 创作控制条')).getByText('off')).toBeInTheDocument();
+  });
+
+  it('starts new page loads at the top of the document', () => {
+    const previousScrollRestoration = window.history.scrollRestoration;
+
+    const { unmount } = render(<App />);
+
+    expect(window.history.scrollRestoration).toBe('manual');
+    expect(window.scrollTo).toHaveBeenCalledWith(0, 0);
+
+    unmount();
+    expect(window.history.scrollRestoration).toBe(previousScrollRestoration);
   });
 
   it('guards generation against repeated clicks before the first request finishes', async () => {
@@ -188,42 +209,5 @@ describe('App', () => {
       expect(screen.queryByRole('option', { name: /DALL-E-3/ })).not.toBeInTheDocument();
       expect(screen.getByRole('option', { name: /GPT Image 2/ })).toBeInTheDocument();
     });
-  });
-
-  it('generates through hosted proxy mode without browser OpenAI key', async () => {
-    window.localStorage.setItem('gpt-image-workbench/openai-settings', JSON.stringify({
-      hostedProxy: true,
-      proxyAccessToken: 'deploy-token',
-      apiKey: '',
-      model: 'gpt-image-1',
-      timeoutSeconds: 180,
-      defaultSize: '1024x1024',
-      defaultQuality: 'auto',
-      defaultOutputFormat: 'auto',
-      defaultBackground: 'auto',
-      defaultOutputCompression: 0,
-    }));
-    vi.mocked(generateOpenAIImages).mockResolvedValue({
-      ok: true,
-      images: [{ id: 'image-1', src: 'data:image/png;base64,abc123', source: 'base64', mimeType: 'image/png', extension: 'png' }],
-    });
-
-    render(<App />);
-
-    expect(screen.queryByLabelText('OpenAI API key')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('部署访问 token')).toHaveValue('deploy-token');
-    fireEvent.change(screen.getByLabelText('正向提示词'), {
-      target: { value: 'warm portrait' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '生成图片' }));
-
-    await waitFor(() => {
-      expect(generateOpenAIImages).toHaveBeenCalledTimes(1);
-    });
-    expect(generateOpenAIImages).toHaveBeenCalledWith(expect.objectContaining({
-      hostedProxy: true,
-      proxyAccessToken: 'deploy-token',
-      apiKey: '',
-    }), expect.any(Object), expect.any(Object));
   });
 });
