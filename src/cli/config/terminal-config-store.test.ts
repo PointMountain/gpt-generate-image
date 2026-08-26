@@ -22,7 +22,8 @@ describe('terminal-config-store', () => {
     const config = await loadTerminalConfig(await createTempDir());
 
     expect(config.apiKey).toBe('');
-    expect(config.model).toBe('gpt-image-1');
+    expect(config.model).toBe('gpt-image-2');
+    expect(config.defaultQuality).toBe('high');
   });
 
   it('saves and reloads terminal config from an isolated directory', async () => {

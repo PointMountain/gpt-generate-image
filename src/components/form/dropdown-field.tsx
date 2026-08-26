@@ -46,6 +46,7 @@ export function DropdownField({
   const listboxId = `${id}-listbox`;
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const listboxRef = useRef<HTMLDivElement | null>(null);
+  const hasOpenedRef = useRef(false);
   const [isOpen, setIsOpen] = useState(false);
   const selectedOption = options.find((option) => option.value === value);
   const selectedIndex = options.findIndex((option) => option.value === value);
@@ -62,11 +63,14 @@ export function DropdownField({
   useEffect(() => {
     // 打开后把焦点稳定留在 listbox，自定义键盘导航和 aria-activedescendant 才一致。
     if (isOpen) {
+      hasOpenedRef.current = true;
       listboxRef.current?.focus();
       return;
     }
 
-    triggerRef.current?.focus();
+    if (hasOpenedRef.current) {
+      triggerRef.current?.focus();
+    }
   }, [isOpen]);
 
   function open(nextIndex = activeIndex) {
@@ -212,7 +216,9 @@ export function DropdownField({
       >
         <span id={`${id}-value`} className="dropdown-field__value">{visibleValue}</span>
         {selectedOption?.badge ? <span className="dropdown-field__badge">{selectedOption.badge}</span> : null}
-        <span className="dropdown-field__chevron" aria-hidden="true">v</span>
+        <svg className="dropdown-field__chevron" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="m3.5 5.75 4.5 4.5 4.5-4.5" />
+        </svg>
       </button>
       {isOpen ? (
         <div

@@ -7,7 +7,6 @@ interface ResultGalleryProps {
   onPreview: (image: ResultImage) => void;
   onDownload: (image: ResultImage, index: number) => void;
   onUseAsReference: (image: ResultImage) => void;
-  onReusePrompt: () => void;
 }
 
 export function ResultGallery({
@@ -15,7 +14,6 @@ export function ResultGallery({
   onPreview,
   onDownload,
   onUseAsReference,
-  onReusePrompt,
 }: ResultGalleryProps) {
   return (
     <section className="gallery-stage" aria-labelledby="current-results-heading">
@@ -23,7 +21,7 @@ export function ResultGallery({
         <div>
           <p className="section-heading__eyebrow">Result loop</p>
           <h3 id="current-results-heading">当前结果</h3>
-          <p>每张图都能直接预览、下载、设为参考图，或把提示词带回下一轮。</p>
+          <p>每张图都能直接预览、下载，或带入下一次创作轮次。</p>
         </div>
         {results.length ? <span className="surface-header__badge">{results.length} 张图片</span> : null}
       </div>
@@ -38,7 +36,6 @@ export function ResultGallery({
               onPreview={onPreview}
               onDownload={onDownload}
               onUseAsReference={onUseAsReference}
-              onReusePrompt={onReusePrompt}
             />
           ))}
         </div>
@@ -46,7 +43,7 @@ export function ResultGallery({
         <EmptyState
           eyebrow="等待第一张作品"
           title="先在左侧完成第一轮生成"
-          body="保存 OpenAI 设置，写一段提示词，然后生成。结果会出现在这里，并能直接进入下一轮参考图流程。"
+          body="完成连接设置，写一段画面描述，然后生成。结果会出现在这里，并能直接进入下一轮创作。"
         />
       )}
     </section>

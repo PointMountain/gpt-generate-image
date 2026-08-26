@@ -32,14 +32,15 @@ describe('openai-settings-store', () => {
     });
   });
 
-  it('falls back to defaults and flags legacy provider data', () => {
+  it('ignores legacy provider data and starts from current defaults', () => {
     window.localStorage.setItem('gpt-image-workbench/providers', JSON.stringify({ providers: [] }));
 
     expect(loadOpenAISettings()).toMatchObject({
-      model: 'gpt-image-1',
+      model: 'gpt-image-2',
       timeoutSeconds: 180,
       useProxy: true,
-      needsReconfiguration: true,
+      defaultQuality: 'high',
+      needsReconfiguration: false,
     });
   });
 
@@ -48,6 +49,8 @@ describe('openai-settings-store', () => {
       apiKey: '',
       baseURL: 'https://api.openai.com/v1',
       useProxy: true,
+      model: 'gpt-image-2',
+      defaultQuality: 'high',
     });
   });
 
@@ -60,7 +63,7 @@ describe('openai-settings-store', () => {
       apiKey: 'sk-test',
       model: '',
     }))).toMatchObject({
-      model: '模型不能为空，默认可使用 gpt-image-1 或兼容端点支持的 gpt-image-2。',
+      model: '模型不能为空，默认使用 gpt-image-2，也可填写兼容端点支持的图片模型。',
     });
   });
 

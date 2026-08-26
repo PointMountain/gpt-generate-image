@@ -16,7 +16,7 @@ const env = {
   all_proxy: '',
 };
 
-const child = spawn(process.execPath, [playwrightTestCli, 'test'], {
+const child = spawn(process.execPath, [playwrightTestCli, 'test', ...process.argv.slice(2)], {
   stdio: 'inherit',
   env,
 });

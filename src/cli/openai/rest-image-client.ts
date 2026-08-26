@@ -67,33 +67,35 @@ function normalizeFailureRecommendation(statusCode: number) {
 }
 
 function buildTextGenerationBody(settings: OpenAIImageSettings, input: OpenAIImageGenerationInput) {
-  const modelId = settings.model.trim().toLowerCase();
-  const usesGptImage2 = modelId === 'gpt-image-2';
   const body: Record<string, string | number> = {
     model: settings.model,
     prompt: input.prompt,
-    n: input.count,
   };
+
+  if (input.count > 1) {
+    body.n = input.count;
+  }
 
   if (input.size !== 'auto') {
     body.size = input.size;
   }
 
-  if (!usesGptImage2 && input.quality !== 'auto') {
+  if (input.quality !== 'auto') {
     body.quality = input.quality;
   }
 
-  if (input.background !== 'auto' && !usesGptImage2) {
+  if (
+    input.background !== 'auto' &&
+    !(input.background === 'transparent' && input.outputFormat === 'jpeg')
+  ) {
     body.background = input.background;
   }
 
-  // WebUI 通过本地代理发出的成功请求不会携带 response_format/output_format。
-  // OpenAI-compatible 网关通常默认返回 data[].b64_json；PNG 也作为默认输出处理，避免把某些反代拖进 5xx。
-  if (!usesGptImage2 && input.outputFormat !== 'auto' && input.outputFormat !== 'png') {
+  if (input.outputFormat !== 'auto') {
     body.output_format = input.outputFormat;
   }
 
-  if (!usesGptImage2 && (input.outputFormat === 'jpeg' || input.outputFormat === 'webp') && input.outputCompression > 0) {
+  if ((input.outputFormat === 'jpeg' || input.outputFormat === 'webp') && input.outputCompression > 0) {
     body.output_compression = input.outputCompression;
   }
 

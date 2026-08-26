@@ -60,16 +60,16 @@ describe('rest-image-client', () => {
     expect(body).toMatchObject({
       model: 'gpt-image-2',
       prompt: 'warm portrait',
-      n: 1,
       size: '1024x1024',
+      output_format: 'png',
+      background: 'transparent',
     });
+    expect(body).not.toHaveProperty('n');
     expect(body).not.toHaveProperty('response_format');
-    expect(body).not.toHaveProperty('output_format');
-    expect(body).not.toHaveProperty('background');
     expect(result.ok).toBe(true);
   });
 
-  it('omits gpt-image-2-only params to match the WebUI request shape', async () => {
+  it('sends gpt-image-2 quality, format, and compression when requested', async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       data: [{ b64_json: 'ZmFrZS1pbWFnZQ==' }],
     }), {
@@ -84,9 +84,33 @@ describe('rest-image-client', () => {
     }), { fetcher });
 
     const body = JSON.parse(fetcher.mock.calls[0]?.[1]?.body as string) as Record<string, unknown>;
-    expect(body).not.toHaveProperty('quality');
-    expect(body).not.toHaveProperty('output_format');
-    expect(body).not.toHaveProperty('output_compression');
+    expect(body).toMatchObject({
+      quality: 'medium',
+      output_format: 'webp',
+      output_compression: 80,
+    });
+  });
+
+  it('does not send transparent background with JPEG output', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: [{ b64_json: 'ZmFrZS1pbWFnZQ==' }],
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
+
+    await generateOpenAIImagesForCli(createSettings(), createInput({
+      outputFormat: 'jpeg',
+      outputCompression: 82,
+      background: 'transparent',
+    }), { fetcher });
+
+    const body = JSON.parse(fetcher.mock.calls[0]?.[1]?.body as string) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      output_format: 'jpeg',
+      output_compression: 82,
+    });
+    expect(body).not.toHaveProperty('background');
   });
 
   it('sends non-default output formats for other models when explicitly requested', async () => {

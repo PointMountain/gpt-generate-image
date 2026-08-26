@@ -38,6 +38,7 @@ describe('preset-store', () => {
       count: 4,
       outputCompression: 100,
       outputFormat: 'auto',
+      modelId: 'gpt-image-2',
     });
   });
 

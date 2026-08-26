@@ -3,6 +3,7 @@ import type {
   ImageModelCandidate,
   ModelDiscoveryFailure,
 } from '../../lib/openai/model-discovery';
+import { DEFAULT_IMAGE_MODEL } from '../../lib/openai/openai-option-sets';
 
 export type ModelDiscoveryStatus = 'idle' | 'loading' | 'success' | 'error';
 
@@ -104,7 +105,7 @@ export function ModelPicker({
           id="openai-model"
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          placeholder="gpt-image-1"
+          placeholder={DEFAULT_IMAGE_MODEL}
         />
         {validationError ? <span className="field__error">{validationError}</span> : null}
         <span className="field__hint">用于新模型、兼容端点或模型列表不可用时的兜底。</span>

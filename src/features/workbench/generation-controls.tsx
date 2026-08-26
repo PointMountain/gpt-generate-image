@@ -5,8 +5,13 @@ import {
   QUALITY_OPTIONS as OPENAI_QUALITY_OPTIONS,
   SIZE_OPTIONS as OPENAI_SIZE_OPTIONS,
 } from '../../lib/openai/openai-option-sets';
+import {
+  supportsLegacyImageQuality,
+  supportsTransparentBackground,
+} from '../../lib/openai/ai-sdk-image-client';
 
 interface GenerationControlsProps {
+  modelId: string;
   size: string;
   count: number;
   quality: string;
@@ -37,6 +42,7 @@ const FORMAT_OPTIONS: DropdownOption[] = OPENAI_FORMAT_OPTIONS;
 const BACKGROUND_OPTIONS: DropdownOption[] = OPENAI_BACKGROUND_OPTIONS;
 
 export function GenerationControls({
+  modelId,
   size,
   count,
   quality,
@@ -45,15 +51,25 @@ export function GenerationControls({
   outputCompression,
   onChange,
 }: GenerationControlsProps) {
+  const supportsCompression = outputFormat === 'jpeg' || outputFormat === 'webp';
+  const qualityOptions = QUALITY_OPTIONS.map((option) => (
+    ['standard', 'hd'].includes(option.value) && !supportsLegacyImageQuality(modelId)
+      ? { ...option, disabled: true, description: '仅 DALL-E 模型支持' }
+      : option
+  ));
+  const backgroundOptions = BACKGROUND_OPTIONS.map((option) => (
+    option.value === 'transparent' && (!supportsTransparentBackground(modelId) || outputFormat === 'jpeg')
+      ? {
+          ...option,
+          disabled: true,
+          description: outputFormat === 'jpeg' ? 'JPEG 不支持透明背景' : `${modelId || '当前模型'} 暂不支持`,
+        }
+      : option
+  ));
+
   return (
-    <div className="section-card section-card--flat generation-controls">
-      <div className="list-header list-header--compact">
-        <div>
-          <h3>生成参数</h3>
-          <p>自动值不会随请求发送，模型会按默认策略处理。</p>
-        </div>
-      </div>
-      <div className="field-grid field-grid--two">
+    <div className="generation-controls">
+      <div className="field-grid generation-controls__core">
         <DropdownField
           id="image-size"
           label="尺寸"
@@ -73,38 +89,56 @@ export function GenerationControls({
           id="image-quality"
           label="质量"
           value={quality}
-          options={QUALITY_OPTIONS}
+          options={qualityOptions}
           onChange={(value) => onChange('quality', value)}
           hint="请求不稳时先切到快速。"
         />
-        <DropdownField
-          id="image-format"
-          label="输出格式"
-          value={outputFormat}
-          options={FORMAT_OPTIONS}
-          onChange={(value) => onChange('outputFormat', value)}
-          hint="自动格式不会随请求发送。"
-        />
-        <DropdownField
-          id="image-background"
-          label="背景"
-          value={background}
-          options={BACKGROUND_OPTIONS}
-          onChange={(value) => onChange('background', value)}
-        />
-        <div className="field">
-          <label htmlFor="image-compression">压缩</label>
-          <input
-            id="image-compression"
-            type="number"
-            min={0}
-            max={100}
-            value={outputCompression}
-            onChange={(event) => onChange('outputCompression', event.target.value)}
-          />
-          <span className="field__hint">0 表示不发送 output_compression。</span>
-        </div>
       </div>
+
+      <details className="settings-disclosure generation-controls__advanced">
+        <summary>
+          <span className="generation-controls__advanced-title">
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="m5 3.5 5 4.5-5 4.5" />
+            </svg>
+            <strong>更多设置</strong>
+          </span>
+          <small>{outputFormat.toUpperCase()} · {background === 'auto' ? '不透明' : background}</small>
+        </summary>
+        <div className="settings-disclosure__content field-grid generation-controls__advanced-fields">
+          <DropdownField
+            id="image-format"
+            label="输出格式"
+            value={outputFormat}
+            options={FORMAT_OPTIONS}
+            onChange={(value) => onChange('outputFormat', value)}
+            hint="自动格式不会随请求发送。"
+          />
+          <DropdownField
+            id="image-background"
+            label="背景"
+            value={background}
+            options={backgroundOptions}
+            onChange={(value) => onChange('background', value)}
+            hint={!supportsTransparentBackground(modelId) ? `${modelId} 当前不提供透明背景。` : undefined}
+          />
+          <div className="field generation-controls__compression">
+            <label htmlFor="image-compression">压缩</label>
+            <input
+              id="image-compression"
+              type="number"
+              min={0}
+              max={100}
+              value={outputCompression}
+              disabled={!supportsCompression}
+              onChange={(event) => onChange('outputCompression', event.target.value)}
+            />
+            <span className="field__hint">
+              {supportsCompression ? '0 表示不发送压缩参数。' : '仅 JPEG 与 WEBP 支持压缩。'}
+            </span>
+          </div>
+        </div>
+      </details>
     </div>
   );
 }

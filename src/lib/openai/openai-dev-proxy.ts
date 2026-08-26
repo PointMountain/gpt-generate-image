@@ -3,7 +3,7 @@ import { lookup } from 'node:dns/promises';
 import { createProxyAwareFetch, parseProxyPreference } from './proxy-aware-fetch';
 
 const DEFAULT_ALLOWED_PROXY_HOSTS = ['*'];
-const MAX_PROXY_REQUEST_BYTES = 40 * 1024 * 1024;
+const MAX_PROXY_REQUEST_BYTES = 96 * 1024 * 1024;
 const MAX_PROXY_RESPONSE_BYTES = 80 * 1024 * 1024;
 const PROXY_TIMEOUT_MS = 190_000;
 

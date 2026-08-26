@@ -24,7 +24,7 @@ describe('GenerationScreen', () => {
       />,
     );
 
-    expect(lastFrame()).toContain('gpt-image-1');
+    expect(lastFrame()).toContain('gpt-image-2');
     expect(lastFrame()).toContain('/help 查看指令');
     expect(lastFrame()).toContain('/config');
     expect(lastFrame()).not.toContain('/apikey [value]');

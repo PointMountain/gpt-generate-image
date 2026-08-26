@@ -21,6 +21,11 @@ vi.mock('../lib/openai/model-discovery', async (importOriginal) => {
 });
 
 describe('App', () => {
+  function openSettings() {
+    fireEvent.click(screen.getByRole('button', { name: '连接设置' }));
+    return screen.getByRole('dialog', { name: '连接图像模型' });
+  }
+
   beforeEach(() => {
     window.localStorage.clear();
     Object.defineProperty(window, 'scrollTo', {
@@ -39,12 +44,60 @@ describe('App', () => {
   it('renders the main workbench regions', () => {
     render(<App />);
 
-    expect(screen.getByRole('heading', { name: 'TokenCanvas' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '创作下一轮' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'OpenAI 设置' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '当前结果' })).toBeInTheDocument();
-    expect(within(screen.getByLabelText('OpenAI 创作控制条')).getByText('代理')).toBeInTheDocument();
-    expect(within(screen.getByLabelText('OpenAI 创作控制条')).getByText('on')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '造境' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '把想法压进画布' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '三步开始创作' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '连接图像模型' })).not.toBeInTheDocument();
+  });
+
+  it('opens and closes connection settings as a drawer', () => {
+    render(<App />);
+
+    const settingsTrigger = screen.getByRole('button', { name: '连接设置' });
+    settingsTrigger.focus();
+    const dialog = openSettings();
+    expect(within(dialog).getByLabelText('OpenAI API key')).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '关闭连接设置' }));
+    expect(screen.queryByRole('dialog', { name: '连接图像模型' })).not.toBeInTheDocument();
+    expect(settingsTrigger).toHaveFocus();
+  });
+
+  it('applies saved default parameters to an untouched creation form', () => {
+    render(<App />);
+
+    const dialog = openSettings();
+    fireEvent.change(within(dialog).getByLabelText('OpenAI API key'), {
+      target: { value: 'sk-test' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: /默认质量/ }));
+    fireEvent.click(screen.getByRole('option', { name: '高质量' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '保存 OpenAI 设置' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '关闭连接设置' }));
+
+    expect(screen.getByRole('button', { name: '质量 高质量' })).toBeInTheDocument();
+  });
+
+  it('lets the user hide and reopen the first-run guide', () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: '暂时隐藏引导' }));
+    expect(screen.queryByRole('heading', { name: '三步开始创作' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '打开创作引导' }));
+    expect(screen.getByRole('heading', { name: '三步开始创作' })).toBeInTheDocument();
+  });
+
+  it('switches between the creation workbench and the recipe library', () => {
+    render(<App />);
+
+    const primaryNavigation = screen.getByRole('navigation', { name: '主导航' });
+    fireEvent.click(within(primaryNavigation).getByRole('button', { name: '配方' }));
+    expect(screen.getByRole('heading', { name: '创作配方' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '创作历史' })).toBeInTheDocument();
+
+    fireEvent.click(within(primaryNavigation).getByRole('button', { name: '创作' }));
+    expect(screen.getByRole('heading', { name: '把想法压进画布' })).toBeInTheDocument();
   });
 
   it('starts new page loads at the top of the document', () => {
@@ -63,10 +116,12 @@ describe('App', () => {
     vi.mocked(generateOpenAIImages).mockReturnValue(new Promise(() => undefined));
     render(<App />);
 
-    fireEvent.change(screen.getByLabelText('OpenAI API key'), {
+    const dialog = openSettings();
+    fireEvent.change(within(dialog).getByLabelText('OpenAI API key'), {
       target: { value: 'sk-test' },
     });
-    fireEvent.change(screen.getByLabelText('正向提示词'), {
+    fireEvent.click(within(dialog).getByRole('button', { name: '关闭连接设置' }));
+    fireEvent.change(screen.getByLabelText('画面描述'), {
       target: { value: 'warm portrait' },
     });
 
@@ -96,10 +151,11 @@ describe('App', () => {
 
     render(<App />);
 
-    fireEvent.change(screen.getByLabelText('OpenAI API key'), {
+    const dialog = openSettings();
+    fireEvent.change(within(dialog).getByLabelText('OpenAI API key'), {
       target: { value: 'sk-test' },
     });
-    fireEvent.click(within(screen.getByLabelText('OpenAI 创作控制条')).getByRole('button', { name: '拉取模型' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '拉取模型' }));
 
     await waitFor(() => {
       expect(fetchOpenAIImageModels).toHaveBeenCalledTimes(1);
@@ -128,10 +184,11 @@ describe('App', () => {
 
     render(<App />);
 
-    fireEvent.change(screen.getByLabelText('OpenAI API key'), {
+    const dialog = openSettings();
+    fireEvent.change(within(dialog).getByLabelText('OpenAI API key'), {
       target: { value: 'sk-test' },
     });
-    fireEvent.click(within(screen.getByLabelText('OpenAI 创作控制条')).getByRole('button', { name: '拉取模型' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '拉取模型' }));
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /图片模型/ })).toBeInTheDocument();
@@ -159,16 +216,17 @@ describe('App', () => {
 
     render(<App />);
 
-    fireEvent.change(screen.getByLabelText('OpenAI API key'), {
+    const dialog = openSettings();
+    fireEvent.change(within(dialog).getByLabelText('OpenAI API key'), {
       target: { value: 'sk-test' },
     });
-    fireEvent.click(within(screen.getByLabelText('OpenAI 创作控制条')).getByRole('button', { name: '拉取模型' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '拉取模型' }));
 
     fireEvent.click(screen.getByText('高级连接设置'));
     fireEvent.change(screen.getByLabelText('baseURL'), {
       target: { value: 'https://example.com/v1' },
     });
-    fireEvent.click(within(screen.getByLabelText('OpenAI 创作控制条')).getByRole('button', { name: '拉取模型' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '拉取模型' }));
 
     resolveSecond?.({
       ok: true,
@@ -185,7 +243,7 @@ describe('App', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('1 个候选')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /图片模型/ })).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole('button', { name: /图片模型/ }));

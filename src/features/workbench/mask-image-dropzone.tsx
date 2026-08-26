@@ -34,7 +34,9 @@ export function MaskImageDropzone({
           <div className="reference-dropzone__preview">
             <img src={previewUrl} alt="Mask 预览" />
             <div>
-              <strong>{fileName || '已载入 mask'}</strong>
+              <strong className="reference-dropzone__file-name" title={fileName || undefined}>
+                {fileName || '已载入 mask'}
+              </strong>
               <p>mask 会随源图一起发送。</p>
               <div className="button-row">
                 <label className="button button--ghost">

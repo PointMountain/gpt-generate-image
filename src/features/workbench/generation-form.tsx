@@ -88,12 +88,12 @@ export function GenerationForm({
   const modeLabel = form.mode === 'text' ? '文生图' : form.mode === 'image' ? '图生图' : '遮罩编辑';
 
   return (
-    <div className="composer-panel">
+    <div className="composer-panel" aria-label="创作配方编辑器">
       <div className="surface-header surface-header--tight">
         <div>
-          <p className="section-heading__eyebrow">Create workspace</p>
-          <h2>创作下一轮</h2>
-          <p>先写提示词，再决定是否附加参考图或 mask，最后生成并把结果带回下一轮。</p>
+          <p className="section-heading__eyebrow">创作配方</p>
+          <h2>把想法压进画布</h2>
+          <p>写下画面，再补充输入素材与关键参数。高级设置会在需要时出现。</p>
         </div>
         <div className="composer-panel__badges">
           <span className="surface-header__badge">
@@ -120,7 +120,7 @@ export function GenerationForm({
 
         {hasReferenceImage || hasMask ? (
           <div className="asset-summary" aria-live="polite">
-            {hasReferenceImage ? <span>{form.referenceImages.length} 张参考图将随请求发送</span> : null}
+            {hasReferenceImage ? <span>{form.referenceImages.length} 张输入素材将随请求发送</span> : null}
             {hasMask ? <span>mask 文件已附加</span> : null}
           </div>
         ) : null}
@@ -135,18 +135,28 @@ export function GenerationForm({
           />
 
           <GenerationControls
+            modelId={selectedModelLabel}
             size={form.size}
             count={form.count}
             quality={form.quality}
             outputFormat={form.outputFormat}
             background={form.background}
             outputCompression={form.outputCompression}
-            onChange={(field, value) =>
-              onChangeForm({
+            onChange={(field, value) => {
+              const nextForm = {
                 ...form,
                 [field]: field === 'count' || field === 'outputCompression' ? Number(value) : value,
-              })
-            }
+              };
+
+              if (field === 'outputFormat' && value === 'jpeg' && nextForm.background === 'transparent') {
+                nextForm.background = 'auto';
+              }
+              if (field === 'outputFormat' && !['jpeg', 'webp'].includes(value)) {
+                nextForm.outputCompression = 0;
+              }
+
+              onChangeForm(nextForm);
+            }}
           />
         </div>
 

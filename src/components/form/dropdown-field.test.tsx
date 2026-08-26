@@ -9,6 +9,23 @@ const OPTIONS = [
 ];
 
 describe('DropdownField', () => {
+  it('does not steal focus when it first mounts', () => {
+    render(
+      <>
+        <button type="button" autoFocus>关闭设置</button>
+        <DropdownField
+          id="quality"
+          label="质量"
+          value="auto"
+          options={OPTIONS}
+          onChange={vi.fn()}
+        />
+      </>,
+    );
+
+    expect(screen.getByRole('button', { name: '关闭设置' })).toHaveFocus();
+  });
+
   it('opens options and selects a value with pointer input', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();

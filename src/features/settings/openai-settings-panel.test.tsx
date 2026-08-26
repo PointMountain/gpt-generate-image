@@ -14,7 +14,7 @@ describe('openai-settings-panel', () => {
       />,
     );
 
-    expect(screen.getByRole('heading', { name: 'OpenAI 设置' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '连接图像模型' })).toBeInTheDocument();
     expect(screen.getByLabelText('OpenAI API key')).toBeInTheDocument();
     expect(screen.getByText('高级连接设置')).toBeInTheDocument();
     expect(screen.getByLabelText('使用同源请求代理')).toBeChecked();
@@ -40,5 +40,28 @@ describe('openai-settings-panel', () => {
 
     await user.click(screen.getByRole('button', { name: '保存 OpenAI 设置' }));
     expect(onSave).toHaveBeenCalled();
+  });
+
+  it('lets users reveal and hide the API key without changing it', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <OpenAISettingsPanel
+        settings={createDefaultOpenAISettings({ apiKey: 'sk-test' })}
+        errors={{}}
+        onChange={vi.fn()}
+        onSave={vi.fn()}
+      />,
+    );
+
+    const apiKeyInput = screen.getByLabelText('OpenAI API key');
+    expect(apiKeyInput).toHaveAttribute('type', 'password');
+
+    await user.click(screen.getByRole('button', { name: '显示 API key' }));
+    expect(apiKeyInput).toHaveAttribute('type', 'text');
+    expect(screen.getByRole('button', { name: '隐藏 API key' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '隐藏 API key' }));
+    expect(apiKeyInput).toHaveAttribute('type', 'password');
   });
 });

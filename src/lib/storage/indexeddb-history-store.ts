@@ -1,4 +1,5 @@
 import { MAX_HISTORY_ITEMS, trimHistoryEntries } from '../../features/history/history-retention';
+import { normalizeHistoryEntry } from '../../features/history/history-record-normalizer';
 import type { HistoryEntry } from '../../features/history/history-types';
 
 const DB_NAME = 'gpt-image-workbench-history';
@@ -53,7 +54,9 @@ export async function listHistoryEntries(): Promise<HistoryEntry[]> {
 
     request.onerror = () => reject(request.error);
     request.onsuccess = () => {
-      const entries = trimHistoryEntries((request.result as HistoryEntry[]) ?? []);
+      const entries = trimHistoryEntries(
+        ((request.result as Partial<HistoryEntry>[]) ?? []).map(normalizeHistoryEntry),
+      );
       database.close();
       resolve(entries);
     };
