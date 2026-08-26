@@ -1,16 +1,16 @@
 <p align="center">
-  <img src="assets/tokencanvas-hero.png" alt="TokenCanvas 主视觉" width="360">
+  <img src="assets/tokencanvas-hero.png" alt="造境主视觉" width="360">
 </p>
 
-# TokenCanvas
+# 造境（TokenCanvas）
 
 把提示词、参考图、mask 和 OpenAI 图片参数放进同一张本地创作画布。
 
-TokenCanvas 是一个浏览器版个人图片工作台。它直接使用 OpenAI 和 AI SDK，适合在本地快速试验、保存历史、复用结果，并把一次次消耗的 Token 变成可继续迭代的创作上下文。
+造境是一个浏览器版个人图片工作台。它直接使用 OpenAI 和 AI SDK，适合在本地快速试验、保存历史、复用结果，并把一次次消耗的 Token 变成可继续迭代的创作上下文。npm 包名与 CLI 命令继续保留 TokenCanvas，避免破坏现有安装方式。
 
 ## 项目定位
 
-TokenCanvas 解决的是“图片生成过程太零散”的问题：脚本、临时请求、下载文件和参数记录经常分开保存，下一轮想沿用上一次结果时，又要重新找 prompt、参考图和输出设置。
+造境解决的是“图片生成过程太零散”的问题：脚本、临时请求、下载文件和参数记录经常分开保存，下一轮想沿用上一次结果时，又要重新找 prompt、参考图和输出设置。
 
 这个项目把创作链路收拢到一个本地页面里：
 
@@ -42,6 +42,7 @@ TokenCanvas 解决的是“图片生成过程太零散”的问题：脚本、�
 | 文生图 | 使用 AI SDK `generateImage()` 调用 OpenAI 图片模型 |
 | 图生图 | 支持单张或多张参考图输入 |
 | 遮罩编辑 | 支持上传 mask 文件 |
+| 素材大小 | 单张参考图或 mask 须小于 50MB，单轮输入素材合计最多 90MB |
 | 输出控制 | 支持 size、count、quality、background、output format、output compression |
 | 结果复用 | 当前结果可预览、下载，并继续作为参考图 |
 | 本地历史 | 保存近期生成记录，减少重复查找 |

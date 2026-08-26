@@ -1,6 +1,8 @@
 import type { OpenAIImageSettings } from './ai-sdk-image-client';
 import {
   BACKGROUND_VALUES,
+  DEFAULT_IMAGE_MODEL,
+  DEFAULT_IMAGE_QUALITY,
   FORMAT_VALUES,
   QUALITY_VALUES,
   SIZE_VALUES,
@@ -8,7 +10,6 @@ import {
 import { validateOpenAIBaseURL } from './openai-endpoint';
 
 const OPENAI_SETTINGS_KEY = 'gpt-image-workbench/openai-settings';
-const LEGACY_PROVIDERS_KEY = 'gpt-image-workbench/providers';
 
 export interface OpenAISettingsStoreState extends OpenAIImageSettings {
   needsReconfiguration: boolean;
@@ -28,10 +29,10 @@ export function createDefaultOpenAISettings(
     apiKey: '',
     baseURL: 'https://api.openai.com/v1',
     useProxy: true,
-    model: 'gpt-image-1',
+    model: DEFAULT_IMAGE_MODEL,
     timeoutSeconds: 180,
     defaultSize: '1024x1024',
-    defaultQuality: 'auto',
+    defaultQuality: DEFAULT_IMAGE_QUALITY,
     defaultOutputFormat: 'auto',
     defaultBackground: 'auto',
     defaultOutputCompression: 0,
@@ -101,10 +102,7 @@ export function loadOpenAISettings(): OpenAISettingsStoreState {
     return normalizeStoredSettings(stored);
   }
 
-  const hasLegacyProviders = Boolean(window.localStorage.getItem(LEGACY_PROVIDERS_KEY));
-  return createDefaultOpenAISettings({
-    needsReconfiguration: hasLegacyProviders,
-  });
+  return createDefaultOpenAISettings();
 }
 
 export function saveOpenAISettings(settings: OpenAISettingsStoreState) {
@@ -120,7 +118,7 @@ export function validateOpenAISettings(settings: OpenAISettingsStoreState) {
   }
 
   if (!settings.model.trim()) {
-    errors.model = '模型不能为空，默认可使用 gpt-image-1 或兼容端点支持的 gpt-image-2。';
+    errors.model = '模型不能为空，默认使用 gpt-image-2，也可填写兼容端点支持的图片模型。';
   }
 
   const baseURLValidation = validateOpenAIBaseURL(settings.baseURL);

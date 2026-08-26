@@ -24,15 +24,16 @@ export function ReferenceImageDropzone({
       <div className="list-header list-header--compact">
         <div>
           <h3>生成模式</h3>
-          <p>{hasReferenceImage ? '参考图已经进入下一次请求。' : '从文字开始，或切到图生图继续迭代。'}</p>
+          <p>{hasReferenceImage ? '输入素材已经进入下一次创作。' : '从文字开始，或切到图生图继续迭代。'}</p>
         </div>
-        {hasReferenceImage ? <span className="provider-tag">参考图请求</span> : null}
+        {hasReferenceImage ? <span className="provider-tag">带素材创作</span> : null}
       </div>
 
-      <div className="button-row composer-mode-row">
+      <div className="button-row composer-mode-row" role="group" aria-label="生成模式">
         <button
           type="button"
           className={`button mode-button ${mode === 'text' ? 'button--primary' : 'button--ghost'}`}
+          aria-pressed={mode === 'text'}
           onClick={() => onModeChange('text')}
         >
           纯文生图
@@ -40,6 +41,7 @@ export function ReferenceImageDropzone({
         <button
           type="button"
           className={`button mode-button ${mode === 'image' ? 'button--primary' : 'button--ghost'}`}
+          aria-pressed={mode === 'image'}
           onClick={() => onModeChange('image')}
           disabled={!supportsReferenceImages}
         >
@@ -48,6 +50,7 @@ export function ReferenceImageDropzone({
         <button
           type="button"
           className={`button mode-button ${mode === 'mask' ? 'button--primary' : 'button--ghost'}`}
+          aria-pressed={mode === 'mask'}
           onClick={() => onModeChange('mask')}
           disabled={!supportsReferenceImages}
         >
@@ -55,21 +58,21 @@ export function ReferenceImageDropzone({
         </button>
       </div>
 
-      {supportsReferenceImages ? (
+      {supportsReferenceImages && mode !== 'text' ? (
         <div className="reference-dropzone">
           {referenceImages.length ? (
             <div className="reference-dropzone__preview">
               <div className="reference-dropzone__thumb-grid">
                 {referenceImages.map((reference) => (
                   <span key={reference.previewUrl} className="reference-dropzone__thumb">
-                    <img src={reference.previewUrl} alt="参考图预览" />
+                    <img src={reference.previewUrl} alt="输入素材预览" />
                     <button type="button" onClick={() => onRemove(reference.previewUrl)}>移除</button>
                   </span>
                 ))}
               </div>
               <div>
-                <strong>{referenceImages.length} 张参考图</strong>
-                <p>最多 16 张，会随下一次图生图或 mask 请求发送。</p>
+                <strong>{referenceImages.length} 张输入素材</strong>
+                <p>最多 16 张，会随下一次图生图或遮罩编辑发送。</p>
                 <label className="button button--ghost">
                   添加图片
                   <input
@@ -91,16 +94,16 @@ export function ReferenceImageDropzone({
                 hidden
                 onChange={(event) => onAddFiles(Array.from(event.target.files ?? []))}
               />
-              <strong>选择参考图</strong>
-              <span>也可以从结果或历史直接设为参考图。</span>
+              <strong>选择输入素材</strong>
+              <span>也可以从结果或创作历史直接加入。</span>
             </label>
           )}
         </div>
-      ) : (
+      ) : !supportsReferenceImages ? (
         <p className="field__hint">
-          当前 OpenAI 图片模型暂未启用参考图模式。
+          当前图片模型暂未启用输入素材模式。
         </p>
-      )}
+      ) : null}
     </div>
   );
 }

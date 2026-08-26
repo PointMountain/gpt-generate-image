@@ -12,8 +12,10 @@ import { normalizeGeneratedFiles, type NormalizedImageResult } from './response-
 export type GenerationMode = 'text' | 'image' | 'mask';
 export type { ImageBinaryInput, ImageReferenceInput } from './image-file-adapter';
 
-export const MAX_IMAGE_FILE_BYTES = 10 * 1024 * 1024;
-export const MAX_TOTAL_IMAGE_BYTES = 40 * 1024 * 1024;
+// GPT Image edits require each source image and mask to be smaller than 50MB.
+// Keep a separate aggregate guard so a browser tab cannot read an unbounded batch into memory.
+export const MAX_IMAGE_FILE_BYTES = 50 * 1024 * 1024;
+export const MAX_TOTAL_IMAGE_BYTES = 90 * 1024 * 1024;
 
 export interface OpenAIImageSettings {
   apiKey: string;
@@ -68,20 +70,57 @@ function removeAuto<T extends Record<string, string | number | undefined>>(value
   );
 }
 
-function supportsTransparentBackground(modelId: string) {
-  return modelId.trim().toLowerCase() !== 'gpt-image-2';
+export function supportsTransparentBackground(modelId: string) {
+  return !modelId.trim().toLowerCase().startsWith('dall-e-');
+}
+
+export function supportsLegacyImageQuality(modelId: string) {
+  return modelId.trim().toLowerCase().startsWith('dall-e-');
 }
 
 function shouldSendOutputCompression(outputFormat: string) {
   return outputFormat === 'jpeg' || outputFormat === 'webp';
 }
 
+export function createOpenAIImageCompatibilityFetch(fetcher: typeof fetch = fetch): typeof fetch {
+  return ((input, init) => {
+    let body = init?.body;
+
+    if (typeof body === 'string') {
+      const contentType = new Headers(init?.headers).get('content-type') ?? '';
+      if (contentType.includes('application/json')) {
+        try {
+          const payload = JSON.parse(body) as Record<string, unknown>;
+          if (payload.n === 1) {
+            delete payload.n;
+            body = JSON.stringify(payload);
+          }
+        } catch {
+          // 非 JSON 请求体原样交给上游，避免兼容层吞掉服务端可诊断的错误。
+        }
+      }
+    } else if (body instanceof FormData && body.get('n') === '1') {
+      body.delete('n');
+    }
+
+    return fetcher(input, {
+      ...init,
+      body,
+    });
+  }) as typeof fetch;
+}
+
 export function buildOpenAIProviderOptions(input: OpenAIImageGenerationInput, modelId = '') {
-  const background = input.background === 'transparent' && !supportsTransparentBackground(modelId)
+  const background = input.background === 'transparent' && (
+    !supportsTransparentBackground(modelId) || input.outputFormat === 'jpeg'
+  )
     ? 'auto'
     : input.background;
+  const quality = ['standard', 'hd'].includes(input.quality) && !supportsLegacyImageQuality(modelId)
+    ? 'auto'
+    : input.quality;
   const openai = removeAuto({
-    quality: input.quality,
+    quality,
     background,
     outputFormat: input.outputFormat,
     outputCompression: shouldSendOutputCompression(input.outputFormat) && input.outputCompression > 0
@@ -115,11 +154,11 @@ function validateImageFileLimits(input: OpenAIImageGenerationInput): ClientFailu
       };
     }
 
-    if (file.size > MAX_IMAGE_FILE_BYTES) {
+    if (file.size >= MAX_IMAGE_FILE_BYTES) {
       return {
         ok: false,
         message: '单张图片过大。',
-        detail: `${file.name || '未命名文件'} 超过 ${Math.round(MAX_IMAGE_FILE_BYTES / 1024 / 1024)}MB`,
+        detail: `${file.name || '未命名文件'} 达到或超过 ${Math.round(MAX_IMAGE_FILE_BYTES / 1024 / 1024)}MB`,
         recommendation: '请先压缩图片，或减少参考图尺寸后再生成。',
       };
     }
@@ -212,6 +251,16 @@ function normalizeError(error: unknown): ClientFailure {
     };
   }
 
+  if (loweredDetail.includes('no available compatible accounts')) {
+    return {
+      ok: false,
+      message: '兼容端点当前没有可用的图片生成账号。',
+      detail,
+      statusCode,
+      recommendation: '这不是画面描述或尺寸造成的；请稍后重试，或切换到有图片额度的端点或模型。',
+    };
+  }
+
   if (statusCode === 429 || loweredDetail.includes('rate limit') || loweredDetail.includes('quota')) {
     return {
       ok: false,
@@ -219,6 +268,16 @@ function normalizeError(error: unknown): ClientFailure {
       detail,
       statusCode,
       recommendation: '检查额度和速率限制，或稍后重试。',
+    };
+  }
+
+  if (isUnsupportedTransparentBackgroundError(error)) {
+    return {
+      ok: false,
+      message: '当前模型或兼容端点不支持透明背景。',
+      detail,
+      statusCode,
+      recommendation: '改用“自动”或“不透明”背景，或切换到明确支持透明输出的模型端点。',
     };
   }
 
@@ -236,6 +295,43 @@ function redactSensitiveDetail(detail: string) {
     .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [redacted]')
     .replace(/sk-[A-Za-z0-9_-]{12,}/g, 'sk-[redacted]')
     .replace(/(Authorization\s*[:=]\s*)[^\s,}]+/gi, '$1[redacted]');
+}
+
+function isUnsupportedImageCountError(error: unknown) {
+  const detail = error instanceof Error ? error.message : String(error);
+  const normalized = detail.toLowerCase();
+
+  return (
+    normalized.includes('unknown parameter') ||
+    normalized.includes('unsupported parameter') ||
+    normalized.includes('unrecognized parameter')
+  ) && (
+    normalized.includes("'n'") ||
+    normalized.includes('.n') ||
+    normalized.includes(' n ')
+  );
+}
+
+function isUnsupportedTransparentBackgroundError(error: unknown) {
+  const detail = error instanceof Error ? error.message : String(error);
+  const normalized = detail.toLowerCase();
+
+  return normalized.includes('transparent') && (
+    normalized.includes('not supported') || normalized.includes('unsupported')
+  );
+}
+
+function strengthenTransparentPrompt(prompt: Awaited<ReturnType<typeof buildPrompt>>) {
+  const requirement = 'Output requirement: use a truly transparent background with an alpha channel; no backdrop, floor, frame, or background shadow.';
+
+  if (typeof prompt === 'string') {
+    return `${prompt}\n\n${requirement}`;
+  }
+
+  return {
+    ...prompt,
+    text: `${prompt.text}\n\n${requirement}`,
+  };
 }
 
 export async function generateOpenAIImages(
@@ -261,7 +357,7 @@ export async function generateOpenAIImages(
   const openai = (deps.createOpenAIProvider ?? createOpenAI)({
     apiKey: settings.apiKey,
     baseURL: transport.baseURL,
-    fetch: transport.fetch,
+    fetch: createOpenAIImageCompatibilityFetch(transport.fetch ?? fetch),
   });
   const runGenerateImage = deps.runGenerateImage ?? generateImage;
   const timeout = createTimeoutController(settings.timeoutSeconds, options.abortSignal);
@@ -272,23 +368,56 @@ export async function generateOpenAIImages(
       return imageLimitError;
     }
 
-    const result = await runGenerateImage({
+    const generationOptions = {
       model: openai.image(settings.model) as ImageModel,
       // 这里保留 AI SDK 的抽象：调用侧只给文本/图片/mask，SDK 负责选择 OpenAI 请求形状。
       prompt: await buildPrompt(input),
-      n: input.count,
       size: input.size === 'auto' ? undefined : input.size as `${number}x${number}`,
       providerOptions: buildOpenAIProviderOptions(input, settings.model),
       maxRetries: 1,
       abortSignal: timeout.signal,
-    });
-    const images = normalizeGeneratedFiles(result.images);
+    };
+    const runGenerationBatch = async (optionsForBatch: typeof generationOptions) => {
+      try {
+        return [await runGenerateImage({
+          ...optionsForBatch,
+          ...(input.count > 1 ? { n: input.count } : {}),
+        })];
+      } catch (error) {
+        if (input.count <= 1 || !isUnsupportedImageCountError(error)) {
+          throw error;
+        }
+
+        const singleResults: GenerateImageResult[] = [];
+        for (let index = 0; index < input.count; index += 1) {
+          singleResults.push(await runGenerateImage(optionsForBatch));
+        }
+        return singleResults;
+      }
+    };
+    let results: GenerateImageResult[];
+
+    try {
+      results = await runGenerationBatch(generationOptions);
+    } catch (error) {
+      if (input.background !== 'transparent' || !isUnsupportedTransparentBackgroundError(error)) {
+        throw error;
+      }
+
+      results = await runGenerationBatch({
+        ...generationOptions,
+        prompt: strengthenTransparentPrompt(generationOptions.prompt),
+        providerOptions: buildOpenAIProviderOptions({ ...input, background: 'auto' }, settings.model),
+      });
+    }
+
+    const images = normalizeGeneratedFiles(results.flatMap((result) => result.images));
 
     if (!images.length) {
       return {
         ok: false,
         message: 'OpenAI 已返回结果，但没有可用图片。',
-        detail: JSON.stringify(result.warnings ?? []),
+        detail: JSON.stringify(results.flatMap((result) => result.warnings ?? [])),
         recommendation: '检查当前模型是否支持图片输出，并尝试降低张数或更换尺寸。',
       };
     }
@@ -296,7 +425,7 @@ export async function generateOpenAIImages(
     return {
       ok: true,
       images,
-      metadata: result.providerMetadata,
+      metadata: results[results.length - 1]?.providerMetadata,
     };
   } catch (error) {
     return normalizeError(error);

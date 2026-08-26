@@ -2,6 +2,7 @@ import type { PresetRecord } from '../history/history-types';
 import type { GenerationMode } from '../../lib/openai/ai-sdk-image-client';
 import {
   BACKGROUND_VALUES,
+  DEFAULT_IMAGE_MODEL,
   FORMAT_VALUES,
   QUALITY_VALUES,
   SIZE_VALUES,
@@ -46,7 +47,7 @@ function normalizeMode(value: unknown): GenerationMode {
 export function normalizePresetRecord(preset: Partial<PresetRecord>): PresetRecord {
   return {
     id: readString(preset.id, createId()),
-    name: readString(preset.name, '未命名预设'),
+    name: readString(preset.name, '未命名配方'),
     prompt: readString(preset.prompt, ''),
     size: readEnum(preset.size, SIZE_VALUES, '1024x1024'),
     count: readNumber(preset.count, 1, 1, 4),
@@ -55,7 +56,7 @@ export function normalizePresetRecord(preset: Partial<PresetRecord>): PresetReco
     background: readEnum(preset.background, BACKGROUND_VALUES, 'auto'),
     outputCompression: readNumber(preset.outputCompression, 0, 0, 100),
     mode: normalizeMode(preset.mode),
-    modelId: readString(preset.modelId, 'gpt-image-1'),
+    modelId: readString(preset.modelId, DEFAULT_IMAGE_MODEL),
     createdAt: readString(preset.createdAt, new Date().toISOString()),
   };
 }

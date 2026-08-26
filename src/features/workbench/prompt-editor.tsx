@@ -11,8 +11,8 @@ export function PromptEditor({
     <div className="prompt-editor">
       <div className="field field--prompt">
         <div className="field__label-row">
-          <label htmlFor="prompt-textarea">正向提示词</label>
-          <span>主体、场景、光线、材质</span>
+          <label htmlFor="prompt-textarea">画面描述</label>
+          <span>{prompt.length} / 3200</span>
         </div>
         <textarea
           id="prompt-textarea"
@@ -21,10 +21,11 @@ export function PromptEditor({
           spellCheck={false}
           value={prompt}
           onChange={(event) => onChangePrompt(event.target.value)}
-          placeholder="暮色中的海边温室，湿润玻璃，电影灯光，细节丰富，低饱和胶片感"
+          maxLength={3200}
+          placeholder="一台复古打字机放在旧木桌上，留出大块纸张留白，粗颗粒丝网印刷质感。"
         />
         <span className="field__hint">
-          结果不满意时，先改这里，再把上一张图设为参考图继续迭代。
+          描述主体、环境、构图和质感；结果不满意时，再把上一张图加入输入素材继续创作。
         </span>
       </div>
     </div>

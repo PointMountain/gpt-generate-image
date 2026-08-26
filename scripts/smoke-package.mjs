@@ -64,7 +64,7 @@ async function waitForWebUI(url, child) {
     try {
       const response = await fetch(url);
       const body = await response.text();
-      if (response.ok && body.includes('TokenCanvas')) {
+      if (response.ok && body.includes('<title>造境｜AI 图片创作台</title>')) {
         return;
       }
       lastError = new Error(`unexpected response ${response.status}`);

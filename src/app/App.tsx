@@ -10,6 +10,7 @@ import { downloadImage } from '../features/results/download-image';
 import {
   GenerationForm,
   createDefaultGenerationFormState,
+  isPristineGenerationForm,
   type GenerationFormState,
 } from '../features/workbench/generation-form';
 import { OpenAISettingsPanel } from '../features/settings/openai-settings-panel';
@@ -31,6 +32,11 @@ import {
   type ImageReferenceInput,
   type OpenAIImageSettings,
 } from '../lib/openai/ai-sdk-image-client';
+import { normalizeBrowserGeneratedImages } from '../lib/openai/browser-output-normalizer';
+import {
+  BrowserMaskInputNormalizationError,
+  normalizeBrowserMaskInputs,
+} from '../lib/openai/browser-mask-input-normalizer';
 import {
   loadOpenAISettings,
   saveOpenAISettings,
@@ -43,6 +49,7 @@ import {
   type ImageModelCandidate,
   type ModelDiscoveryFailure,
 } from '../lib/openai/model-discovery';
+import { normalizeOpenAIBaseURL } from '../lib/openai/openai-endpoint';
 
 const MAX_REFERENCE_IMAGES = 16;
 
@@ -52,6 +59,9 @@ type ModelDiscoveryState = {
   error?: ModelDiscoveryFailure | null;
   fetchedAt?: string;
 };
+
+type WorkbenchView = 'create' | 'library';
+type MobileDestination = 'current' | 'create' | 'recipes' | 'history';
 
 function createHistoryId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -78,6 +88,24 @@ function formFromSettings(settings: OpenAISettingsStoreState) {
     background: settings.defaultBackground,
     outputCompression: settings.defaultOutputCompression,
   });
+}
+
+function formMatchesCurrentDefaults(form: GenerationFormState, settings: OpenAISettingsStoreState) {
+  const defaults = formFromSettings(settings);
+
+  return isPristineGenerationForm(form) || (
+    form.prompt === defaults.prompt &&
+    form.size === defaults.size &&
+    form.count === defaults.count &&
+    form.quality === defaults.quality &&
+    form.outputFormat === defaults.outputFormat &&
+    form.background === defaults.background &&
+    form.outputCompression === defaults.outputCompression &&
+    form.mode === defaults.mode &&
+    form.referenceImages.length === 0 &&
+    form.maskFile === null &&
+    form.maskPreviewUrl === ''
+  );
 }
 
 function createHistoryEntry(
@@ -137,11 +165,19 @@ export function App() {
   } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<ResultImage | null>(null);
+  const [activeView, setActiveView] = useState<WorkbenchView>('create');
+  const [mobileDestination, setMobileDestination] = useState<MobileDestination>('create');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [showGuide, setShowGuide] = useState(true);
   const generationAbortRef = useRef<AbortController | null>(null);
   const generationIdRef = useRef(0);
   const modelDiscoveryAbortRef = useRef<AbortController | null>(null);
   const modelDiscoveryRequestIdRef = useRef(0);
   const latestFormRef = useRef(form);
+  const composerRegionRef = useRef<HTMLDivElement | null>(null);
+  const canvasRegionRef = useRef<HTMLDivElement | null>(null);
+  const settingsDrawerRef = useRef<HTMLElement | null>(null);
+  const settingsReturnFocusRef = useRef<HTMLElement | null>(null);
 
   useLayoutEffect(() => {
     const canControlScrollRestoration = 'scrollRestoration' in window.history;
@@ -163,6 +199,61 @@ export function App() {
   useEffect(() => {
     latestFormRef.current = form;
   }, [form]);
+
+  useEffect(() => {
+    if (!isSettingsOpen) {
+      return undefined;
+    }
+
+    const previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleDrawerKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsSettingsOpen(false);
+        return;
+      }
+
+      if (event.key !== 'Tab' || !settingsDrawerRef.current) {
+        return;
+      }
+
+      const focusable = Array.from(settingsDrawerRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), summary, [href], [tabindex]:not([tabindex="-1"])',
+      )).filter((element) => {
+        const closedDetails = element.closest<HTMLDetailsElement>('details:not([open])');
+        const isClosedDetailsSummary = closedDetails?.querySelector(':scope > summary') === element;
+
+        return (
+          (!closedDetails || isClosedDetailsSummary) &&
+          !element.hasAttribute('hidden') &&
+          element.getClientRects().length > 0 &&
+          window.getComputedStyle(element).visibility !== 'hidden'
+        );
+      });
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (!first || !last) {
+        return;
+      }
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleDrawerKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleDrawerKeyDown);
+      document.body.style.overflow = previousBodyOverflow;
+      settingsReturnFocusRef.current?.focus();
+    };
+  }, [isSettingsOpen]);
 
   useEffect(() => {
     savePresets(presets);
@@ -210,12 +301,24 @@ export function App() {
     setSettingsErrors(errors);
 
     if (Object.keys(errors).length > 0) {
-      setToastMessage('请先补全 OpenAI 设置。');
+      setToastMessage('请先补全连接设置。');
       return;
     }
 
-    saveOpenAISettings(settings);
-    setToastMessage('OpenAI 设置已保存到当前浏览器。');
+    const shouldApplyDefaults = formMatchesCurrentDefaults(form, initialSettingsRef.current ?? settings);
+    const normalizedSettings = {
+      ...settings,
+      baseURL: normalizeOpenAIBaseURL(settings.baseURL),
+      needsReconfiguration: false,
+    };
+
+    saveOpenAISettings(normalizedSettings);
+    setSettings(normalizedSettings);
+    initialSettingsRef.current = normalizedSettings;
+    if (shouldApplyDefaults) {
+      setForm(formFromSettings(normalizedSettings));
+    }
+    setToastMessage('连接设置已保存在当前浏览器。');
   }
 
   async function handleFetchModels() {
@@ -223,7 +326,7 @@ export function App() {
     setSettingsErrors(validationErrors);
 
     if (validationErrors.apiKey || validationErrors.baseURL || validationErrors.timeoutSeconds) {
-      setToastMessage(validationErrors.apiKey || validationErrors.baseURL || validationErrors.timeoutSeconds || '请先修正 OpenAI 设置。');
+      setToastMessage(validationErrors.apiKey || validationErrors.baseURL || validationErrors.timeoutSeconds || '请先修正连接设置。');
       return;
     }
 
@@ -311,7 +414,7 @@ export function App() {
       }));
 
       if (files.length > acceptedFiles.length) {
-        setToastMessage(`最多只能附加 ${MAX_REFERENCE_IMAGES} 张参考图。`);
+        setToastMessage(`最多只能添加 ${MAX_REFERENCE_IMAGES} 张输入素材。`);
       }
 
       return {
@@ -382,7 +485,7 @@ export function App() {
     }
 
     if (nextForm.mode === 'image' && nextForm.referenceImages.length === 0) {
-      return '图生图模式下至少需要一张参考图。';
+      return '图生图模式下至少需要一张输入素材。';
     }
 
     if (nextForm.mode === 'mask' && nextForm.referenceImages.length === 0) {
@@ -410,7 +513,23 @@ export function App() {
     setGenerationError(null);
 
     try {
-      const result = await generateOpenAIImages(settings, nextForm, {
+      const normalizedMaskInputs = nextForm.mode === 'mask'
+        ? await normalizeBrowserMaskInputs(
+          nextForm.referenceImages,
+          nextForm.maskFile,
+          nextForm.size,
+          nextForm.background,
+        )
+        : undefined;
+      if (generationIdRef.current !== generationId) {
+        return;
+      }
+      const requestForm = normalizedMaskInputs ? {
+        ...nextForm,
+        referenceImages: normalizedMaskInputs.referenceImages,
+        maskFile: normalizedMaskInputs.maskFile,
+      } : nextForm;
+      const result = await generateOpenAIImages(settings, requestForm, {
         abortSignal: abortController.signal,
       });
 
@@ -424,17 +543,29 @@ export function App() {
           detail: result.detail,
           recommendation: result.recommendation,
         });
-        setToastMessage('生成失败，请检查 OpenAI 设置和本次输入。');
+        setToastMessage('生成失败，请检查连接设置和本次输入。');
         return;
       }
 
-      const nextResults: ResultImage[] = result.images.map((image) => ({
+      const normalizedImages = await normalizeBrowserGeneratedImages(result.images, {
+        size: nextForm.size,
+        outputFormat: nextForm.outputFormat,
+        outputCompression: nextForm.outputCompression,
+        background: nextForm.background,
+      });
+      if (generationIdRef.current !== generationId) {
+        return;
+      }
+      const nextResults: ResultImage[] = normalizedImages.map((image) => ({
         id: image.id,
         src: image.src,
         source: image.source,
         mimeType: image.mimeType,
         fileName: image.fileName,
         extension: image.extension,
+        width: image.width,
+        height: image.height,
+        dimensionStatus: image.dimensionStatus,
       }));
 
       setResults(nextResults);
@@ -445,15 +576,25 @@ export function App() {
         setToastMessage('图片已生成，但写入历史失败。');
       });
 
-      setToastMessage(`生成完成，共得到 ${nextResults.length} 张图片。`);
+      if (nextResults.some((image) => image.dimensionStatus === 'mismatched')) {
+        setToastMessage(`生成完成，共得到 ${nextResults.length} 张图片；当前端点未遵守请求比例，已保留原图。`);
+      } else if (nextResults.some((image) => image.dimensionStatus === 'resized')) {
+        setToastMessage(`生成完成，共得到 ${nextResults.length} 张图片；已在本地调整为请求尺寸。`);
+      } else {
+        setToastMessage(`生成完成，共得到 ${nextResults.length} 张图片。`);
+      }
     } catch (error) {
       if (generationIdRef.current === generationId) {
         setGenerationError({
-          message: '生成流程意外中断。',
+          message: error instanceof BrowserMaskInputNormalizationError
+            ? '遮罩输入无法适配到请求画布。'
+            : '生成流程意外中断。',
           detail: error instanceof Error ? error.message : String(error),
-          recommendation: '请重新尝试；如果反复出现，请检查浏览器控制台或 OpenAI 设置。',
+          recommendation: error instanceof BrowserMaskInputNormalizationError
+            ? '请确认源图和 mask 尺寸一致，并使用浏览器可读取的 PNG、JPEG 或 WebP 文件。'
+            : '请重新尝试；如果反复出现，请检查浏览器控制台或连接设置。',
         });
-        setToastMessage('生成失败，请检查 OpenAI 设置和本次输入。');
+        setToastMessage('生成失败，请检查连接设置和本次输入。');
       }
     } finally {
       if (generationIdRef.current === generationId) {
@@ -468,7 +609,7 @@ export function App() {
     setSettingsErrors(settingsValidationErrors);
 
     if (Object.keys(settingsValidationErrors).length > 0) {
-      setToastMessage('请先完成 OpenAI 设置。');
+      setToastMessage('请先完成连接设置。');
       return;
     }
 
@@ -486,6 +627,7 @@ export function App() {
     generationIdRef.current += 1;
     generationAbortRef.current = null;
     setIsGenerating(false);
+    setToastMessage('已取消本次创作轮次。');
   }
 
   function applyHistoryEntryToEditor(entry: HistoryEntry) {
@@ -509,9 +651,18 @@ export function App() {
     try {
       const file = await convertImageToFile(image);
       addReferenceFiles([file]);
-      setToastMessage('结果已装入参考图区。');
+      setToastMessage('结果已加入输入素材。');
     } catch {
-      setToastMessage('这张图暂时无法转成参考图。');
+      setToastMessage('这张图暂时无法加入输入素材。');
+    }
+  }
+
+  async function handleDownloadResult(image: ResultImage, index: number) {
+    try {
+      await downloadImage(image, index);
+      setToastMessage('图片下载已开始。');
+    } catch {
+      setToastMessage('图片下载失败，请稍后重试。');
     }
   }
 
@@ -522,7 +673,7 @@ export function App() {
 
   function handleSaveCurrentPreset() {
     if (!form.prompt.trim()) {
-      setToastMessage('先填一段提示词，再保存预设。');
+      setToastMessage('先填一段画面描述，再保存创作配方。');
       return;
     }
 
@@ -541,7 +692,7 @@ export function App() {
 
     setPresets((previous) => upsertPreset(previous, preset));
     setPresetDraftName('');
-    setToastMessage('预设已保存。');
+    setToastMessage('创作配方已保存。');
   }
 
   function applyPreset(preset: PresetRecord) {
@@ -565,94 +716,201 @@ export function App() {
     }));
   }
 
-  const masthead = (
-    <>
-      <div className="masthead-brand">
-        <p className="masthead-brand__eyebrow">OpenAI image studio</p>
-        <h1>TokenCanvas</h1>
-        <p>
-          一个本地浏览器里的 OpenAI 图片创作工作台。选择模型、写提示词、附参考图、生成并把结果继续带回下一轮。
-        </p>
+  const canGenerate = Boolean(settings.apiKey && settings.model && form.prompt.trim());
+  const connectionReady = Boolean(settings.apiKey.trim() && settings.model.trim());
+
+  function showCreateView() {
+    setActiveView('create');
+    setMobileDestination('create');
+  }
+
+  function showLibraryView(destination: MobileDestination = 'recipes') {
+    setActiveView('library');
+    setMobileDestination(destination);
+  }
+
+  function focusPromptEditor() {
+    showCreateView();
+    window.setTimeout(() => document.getElementById('prompt-textarea')?.focus(), 0);
+  }
+
+  function openSettings() {
+    settingsReturnFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    setIsSettingsOpen(true);
+  }
+
+  function selectMobileDestination(destination: MobileDestination) {
+    setMobileDestination(destination);
+    if (destination === 'recipes' || destination === 'history') {
+      setActiveView('library');
+    } else {
+      setActiveView('create');
+    }
+
+    window.setTimeout(() => {
+      if (destination === 'create' || destination === 'recipes') {
+        composerRegionRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+      } else {
+        canvasRegionRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+      }
+    }, 0);
+  }
+
+  const brandRail = (
+    <div className="brand-rail">
+      <div className="brand-rail__identity">
+        <img src="/tokencanvas-hero.png" alt="造境卡通标志" />
+        <h1>造境</h1>
+        <p>一句成画，万象由心</p>
       </div>
 
-      <div className="masthead-meta">
-        <span className="pill">OpenAI</span>
-        <span className="pill pill--muted">
-          {settings.model ? `模型：${settings.model}` : '等待填写模型'}
-        </span>
-        <span className="pill pill--muted">{`代理：${settings.useProxy ? 'on' : 'off'}`}</span>
-      </div>
-    </>
-  );
-
-  const commandBar = (
-    <div className="studio-command-bar" aria-label="OpenAI 创作控制条">
-      <div className="studio-command-bar__identity">
-        <img className="studio-command-bar__mark" src="/tokencanvas-hero.png" alt="" aria-hidden="true" />
-        <div>
-          <p>Provider</p>
-          <strong>OpenAI Image API</strong>
-        </div>
-      </div>
-      <div className="studio-command-bar__metrics">
-        <div>
-          <span>模型</span>
-          <strong>{settings.model || '未选择'}</strong>
-        </div>
-        <div>
-          <span>模型列表</span>
-          <strong>
-            {modelDiscovery.status === 'loading'
-              ? '拉取中'
-              : modelDiscovery.status === 'success'
-                ? `${modelDiscovery.models.length} 个候选`
-                : modelDiscovery.status === 'error'
-                  ? '拉取失败'
-                  : '未拉取'}
-          </strong>
-        </div>
-        <div>
-          <span>连接</span>
-          <strong>
-            {settings.apiKey ? `${settings.timeoutSeconds}s timeout` : '等待 API key'}
-          </strong>
-        </div>
-        <div>
-          <span>代理</span>
-          <strong>{settings.useProxy ? 'on' : 'off'}</strong>
-        </div>
-      </div>
-      <div className="studio-command-bar__actions">
+      <nav className="brand-rail__navigation" aria-label="主导航">
         <button
-          className="button button--ghost"
           type="button"
-          disabled={!settings.apiKey.trim() || modelDiscovery.status === 'loading'}
-          onClick={() => void handleFetchModels()}
+          className={activeView === 'create' ? 'is-active' : ''}
+          aria-current={activeView === 'create' ? 'page' : undefined}
+          onClick={showCreateView}
         >
-          {modelDiscovery.status === 'loading' ? '拉取中' : '拉取模型'}
+          创作
         </button>
-        <button className="button button--primary" type="button" onClick={handleSaveSettings}>
-          保存设置
+        <button
+          type="button"
+          className={activeView === 'library' ? 'is-active' : ''}
+          aria-current={activeView === 'library' ? 'page' : undefined}
+          onClick={() => showLibraryView()}
+        >
+          配方
+        </button>
+      </nav>
+
+      <div className="brand-rail__connection">
+        <div>
+          <span className={connectionReady ? 'status-dot is-ready' : 'status-dot'} aria-hidden="true" />
+          <strong>{connectionReady ? '连接已配置' : '等待连接'}</strong>
+        </div>
+        <p>{settings.model || '尚未选择模型'}</p>
+        <button type="button" onClick={openSettings} aria-label="连接设置">
+          <span>连接设置</span>
+          <span aria-hidden="true">→</span>
         </button>
       </div>
     </div>
   );
 
-  const galleryStage = (
+  const composer = (
+    <div ref={composerRegionRef} className="workbench-composer">
+      {activeView === 'create' ? (
+        <GenerationForm
+          form={form}
+          selectedModelLabel={settings.model}
+          supportsReferenceImages
+          canGenerate={canGenerate}
+          isGenerating={isGenerating}
+          onChangeForm={setForm}
+          onGenerate={() => void handleGenerate()}
+          onClear={clearForm}
+          onAddReferenceFiles={addReferenceFiles}
+          onRemoveReferenceImage={removeReferenceImage}
+          onSelectMaskFile={setMaskFile}
+        />
+      ) : (
+        <PresetPanel
+          presets={presets}
+          draftName={presetDraftName}
+          canSaveCurrent={Boolean(form.prompt.trim())}
+          onDraftNameChange={setPresetDraftName}
+          onSaveCurrent={handleSaveCurrentPreset}
+          onApply={(preset) => {
+            applyPreset(preset);
+            showCreateView();
+          }}
+          onDelete={(presetId) => setPresets((previous) => removePreset(previous, presetId))}
+        />
+      )}
+    </div>
+  );
+
+  const emptyCanvas = showGuide ? (
+    <section className="welcome-canvas" aria-labelledby="welcome-canvas-heading">
+      <div className="welcome-canvas__hero">
+        <span className="welcome-canvas__tape" aria-hidden="true" />
+        <h2 id="welcome-canvas-heading">从一句话开始，<br />把画面做出来。</h2>
+      </div>
+      <p className="welcome-canvas__intro">
+        完成连接、写下创作配方，然后让第一张图片落到结果画布。高级参数会在需要时出现。
+      </p>
+
+      <section className="welcome-guide" aria-labelledby="welcome-guide-heading">
+        <header>
+          <h3 id="welcome-guide-heading">三步开始创作</h3>
+          <button type="button" onClick={() => setShowGuide(false)} aria-label="暂时隐藏引导">
+            暂时隐藏 ×
+          </button>
+        </header>
+        <ol>
+          <li>
+            <button type="button" onClick={openSettings}>
+              <span className="welcome-guide__number">01</span>
+              <span>
+                <strong>连接模型</strong>
+                <small>检查密钥与模型配置</small>
+              </span>
+              <em className={connectionReady ? 'is-ready' : ''}>{connectionReady ? '已填写' : '去连接'}</em>
+            </button>
+          </li>
+          <li>
+            <button type="button" onClick={focusPromptEditor}>
+              <span className="welcome-guide__number">02</span>
+              <span>
+                <strong>写好配方</strong>
+                <small>补全画面描述和关键参数</small>
+              </span>
+              <em className={form.prompt.trim() ? 'is-ready' : ''}>{form.prompt.trim() ? '已完成' : '去填写'}</em>
+            </button>
+          </li>
+          <li>
+            <button type="button" onClick={canGenerate ? () => void handleGenerate() : focusPromptEditor}>
+              <span className="welcome-guide__number">03</span>
+              <span>
+                <strong>开始生成</strong>
+                <small>确认后才会发起创作轮次</small>
+              </span>
+              <em>{canGenerate ? '下一步' : '待完成'}</em>
+            </button>
+          </li>
+        </ol>
+      </section>
+    </section>
+  ) : (
+    <section className="welcome-canvas welcome-canvas--hidden">
+      <div className="welcome-canvas__hero">
+        <h2>画布准备好了。</h2>
+      </div>
+      <p>写好创作配方后，第一张结果会出现在这里。</p>
+      <button className="button button--ghost" type="button" onClick={() => setShowGuide(true)}>
+        打开创作引导
+      </button>
+    </section>
+  );
+
+  const resultCanvas = (
     <>
-      <ResultGallery
-        results={results}
-        onPreview={setPreviewImage}
-        onDownload={(image, index) => void downloadImage(image, index)}
-        onUseAsReference={(image) => void handleReuseImageAsReference(image)}
-        onReusePrompt={() => setToastMessage('当前编辑器已经保留这轮提示词，可直接继续改写。')}
-      />
+      {results.length ? (
+        <ResultGallery
+          results={results}
+          onPreview={setPreviewImage}
+          onDownload={(image, index) => void handleDownloadResult(image, index)}
+          onUseAsReference={(image) => void handleReuseImageAsReference(image)}
+        />
+      ) : emptyCanvas}
 
       {isGenerating ? (
         <div className="top-gap">
           <LoadingState
             title="正在生成图片"
-            body="OpenAI 请求已经发出。保持页面开启等待返回，或取消本次请求后继续调整提示词。"
+            body="创作轮次已经发出。保持页面开启等待返回，也可以取消后继续调整创作配方。"
           />
           <div className="button-row top-gap">
             <button className="button button--ghost" type="button" onClick={handleCancelGeneration}>
@@ -663,72 +921,146 @@ export function App() {
       ) : null}
 
       {generationError ? (
-        <div className="section-card top-gap">
-          <h3>这次生成没有成功</h3>
+        <div className="section-card generation-error top-gap">
+          <h3>这次创作没有成功</h3>
           <p>{generationError.message}</p>
           {generationError.recommendation ? (
             <p className="field__hint">{generationError.recommendation}</p>
           ) : null}
-          <ErrorDetailDrawer summary="展开 OpenAI 返回详情" detail={generationError.detail} />
+          <ErrorDetailDrawer summary="展开模型返回详情" detail={generationError.detail} />
         </div>
       ) : null}
     </>
   );
 
-  const composer = (
-    <GenerationForm
-      form={form}
-      selectedModelLabel={settings.model}
-      supportsReferenceImages
-      canGenerate={Boolean(settings.apiKey && settings.model && form.prompt.trim())}
-      isGenerating={isGenerating}
-      onChangeForm={setForm}
-      onGenerate={() => void handleGenerate()}
-      onClear={clearForm}
-      onAddReferenceFiles={addReferenceFiles}
-      onRemoveReferenceImage={removeReferenceImage}
-      onSelectMaskFile={setMaskFile}
-    />
+  const canvas = (
+    <div className="canvas-shell">
+      <div className="canvas-shell__toolbar">
+        <div className="canvas-shell__tabs">
+          <button
+            type="button"
+            className={activeView === 'create' ? 'is-active' : ''}
+            onClick={showCreateView}
+          >
+            当前
+          </button>
+          <button
+            type="button"
+            className={activeView === 'library' ? 'is-active' : ''}
+            onClick={() => showLibraryView('history')}
+          >
+            历史 <span>{historyEntries.length}</span>
+          </button>
+        </div>
+        <button
+          type="button"
+          className="model-badge"
+          onClick={openSettings}
+          aria-label="打开模型连接设置"
+        >
+          <span aria-hidden="true" />
+          {settings.model || '选择模型'}
+        </button>
+      </div>
+
+      <div ref={canvasRegionRef} className="canvas-shell__content">
+        {activeView === 'create' ? resultCanvas : (
+          <HistoryPanel
+            entries={historyEntries}
+            onApply={(entry) => {
+              applyHistoryEntryToEditor(entry);
+              showCreateView();
+            }}
+            onUseImageAsReference={(image) => void handleReuseImageAsReference(image)}
+            onDelete={(entryId) => void handleDeleteHistory(entryId)}
+          />
+        )}
+      </div>
+    </div>
   );
 
-  const rail = (
+  const mobileHeader = (
+    <div className="mobile-app-header">
+      <strong>造境</strong>
+      <button type="button" onClick={openSettings} aria-label="打开模型连接设置">
+        <span aria-hidden="true" />
+        {settings.model || '选择模型'}
+      </button>
+    </div>
+  );
+
+  const mobileNavigation = (
     <>
-      <OpenAISettingsPanel
-        settings={settings}
-        errors={settingsErrors}
-        modelDiscovery={modelDiscovery}
-        onChange={handleSettingsChange}
-        onSave={handleSaveSettings}
-        onFetchModels={() => void handleFetchModels()}
-      />
-      <HistoryPanel
-        entries={historyEntries}
-        onApply={applyHistoryEntryToEditor}
-        onUseImageAsReference={(image) => void handleReuseImageAsReference(image)}
-        onDelete={(entryId) => void handleDeleteHistory(entryId)}
-      />
-      <PresetPanel
-        presets={presets}
-        draftName={presetDraftName}
-        canSaveCurrent={Boolean(form.prompt.trim())}
-        onDraftNameChange={setPresetDraftName}
-        onSaveCurrent={handleSaveCurrentPreset}
-        onApply={applyPreset}
-        onDelete={(presetId) => setPresets((previous) => removePreset(previous, presetId))}
-      />
+      {([
+        ['current', '当前'],
+        ['create', '创作'],
+        ['recipes', '配方'],
+        ['history', '历史'],
+      ] as const).map(([destination, label]) => (
+        <button
+          key={destination}
+          type="button"
+          className={mobileDestination === destination ? 'is-active' : ''}
+          aria-current={mobileDestination === destination ? 'page' : undefined}
+          onClick={() => selectMobileDestination(destination)}
+        >
+          {label}
+        </button>
+      ))}
     </>
   );
 
+  const settingsDrawer = isSettingsOpen ? (
+    <div className="settings-drawer-layer">
+      <button
+        type="button"
+        className="settings-drawer-layer__scrim"
+        aria-label="关闭连接设置遮罩"
+        onClick={() => setIsSettingsOpen(false)}
+      />
+      <aside
+        ref={settingsDrawerRef}
+        className="settings-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-drawer-heading"
+      >
+        <header className="settings-drawer__header">
+          <div>
+            <p>模型连接</p>
+            <h2 id="settings-drawer-heading">连接图像模型</h2>
+          </div>
+          <button type="button" autoFocus onClick={() => setIsSettingsOpen(false)} aria-label="关闭连接设置">
+            ×
+          </button>
+        </header>
+        <div className="settings-drawer__body">
+          <div className="settings-drawer__privacy">
+            API key 只保存在这台设备，不会写入创作历史或创作配方。
+          </div>
+          <OpenAISettingsPanel
+            settings={settings}
+            errors={settingsErrors}
+            modelDiscovery={modelDiscovery}
+            onChange={handleSettingsChange}
+            onSave={handleSaveSettings}
+            onFetchModels={() => void handleFetchModels()}
+            showHeading={false}
+          />
+        </div>
+      </aside>
+    </div>
+  ) : null;
+
   return (
-    <AppShell
-      masthead={masthead}
-      footer={<p>OpenAI API key 和 baseURL 仅保存在当前浏览器。</p>}
-    >
+    <AppShell>
       <WorkbenchFrame
-        commandBar={commandBar}
-        gallery={galleryStage}
+        brandRail={brandRail}
         composer={composer}
-        rail={rail}
+        canvas={canvas}
+        mobileHeader={mobileHeader}
+        mobileNavigation={mobileNavigation}
+        overlay={settingsDrawer}
       />
 
       <ToastRegion message={toastMessage} />

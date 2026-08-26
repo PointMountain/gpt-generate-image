@@ -32,7 +32,7 @@ describe('generate-result', () => {
     expect(result).toMatchObject({
       ok: true,
       mode: 'text',
-      model: 'gpt-image-1',
+      model: 'gpt-image-2',
     });
     if (result.ok) {
       expect(result.outputFiles[0]?.path).toContain(outputDir);

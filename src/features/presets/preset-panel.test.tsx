@@ -32,8 +32,8 @@ describe('preset-panel', () => {
       />,
     );
 
-    expect(screen.getByText('Prompt Assets')).toBeInTheDocument();
-    expect(screen.getByText('1 个模板')).toBeInTheDocument();
+    expect(screen.getByText('创作资产')).toBeInTheDocument();
+    expect(screen.getByText('1 个配方')).toBeInTheDocument();
     expect(screen.getByText('gpt-image-1 · 1024x1024')).toBeInTheDocument();
     expect(screen.getByText('图生图')).toBeInTheDocument();
   });
@@ -57,14 +57,18 @@ describe('preset-panel', () => {
       />,
     );
 
-    await user.type(screen.getByLabelText('新预设名称'), '模板');
-    await user.click(screen.getByRole('button', { name: '保存当前创作设置' }));
+    await user.type(screen.getByLabelText('新配方名称'), '配方');
+    await user.click(screen.getByRole('button', { name: '保存当前创作配方' }));
     await user.click(screen.getByRole('button', { name: '应用到创作条' }));
     await user.click(screen.getByRole('button', { name: '删除' }));
 
     expect(onDraftNameChange).toHaveBeenCalled();
     expect(onSaveCurrent).toHaveBeenCalled();
     expect(onApply).toHaveBeenCalledWith(preset);
+    expect(screen.getByText('确认删除这份配方？')).toBeInTheDocument();
+    expect(onDelete).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: '确认删除' }));
     expect(onDelete).toHaveBeenCalledWith(preset.id);
   });
 });

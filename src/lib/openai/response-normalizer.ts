@@ -7,6 +7,9 @@ export interface NormalizedImageResult {
   mimeType?: string;
   fileName?: string;
   extension?: string;
+  width?: number;
+  height?: number;
+  dimensionStatus?: 'matched' | 'resized' | 'mismatched';
 }
 
 function createId() {

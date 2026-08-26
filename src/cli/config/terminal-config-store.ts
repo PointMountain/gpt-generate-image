@@ -6,6 +6,8 @@ import type { OpenAIImageSettings } from '../../lib/openai/ai-sdk-image-client';
 import { DEFAULT_OPENAI_BASE_URL, validateOpenAIBaseURL } from '../../lib/openai/openai-endpoint';
 import {
   BACKGROUND_VALUES,
+  DEFAULT_IMAGE_MODEL,
+  DEFAULT_IMAGE_QUALITY,
   FORMAT_VALUES,
   QUALITY_VALUES,
   SIZE_VALUES,
@@ -48,10 +50,10 @@ export function createDefaultTerminalConfig(overrides: Partial<TerminalConfig> =
     apiKey: '',
     baseURL: DEFAULT_OPENAI_BASE_URL,
     useProxy: false,
-    model: 'gpt-image-1',
+    model: DEFAULT_IMAGE_MODEL,
     timeoutSeconds: 180,
     defaultSize: '1024x1024',
-    defaultQuality: 'auto',
+    defaultQuality: DEFAULT_IMAGE_QUALITY,
     defaultOutputFormat: 'auto',
     defaultBackground: 'auto',
     defaultOutputCompression: 0,

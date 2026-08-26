@@ -52,10 +52,10 @@ describe('generation-form', () => {
       />,
     );
 
-    expect(screen.getByText('1 张参考图')).toBeInTheDocument();
-    expect(screen.getByText('1 张参考图将随请求发送')).toBeInTheDocument();
-    expect(screen.getByText('参考图请求')).toBeInTheDocument();
-    expect(screen.getByText('最多 16 张，会随下一次图生图或 mask 请求发送。')).toBeInTheDocument();
+    expect(screen.getByText('1 张输入素材')).toBeInTheDocument();
+    expect(screen.getByText('1 张输入素材将随请求发送')).toBeInTheDocument();
+    expect(screen.getByText('带素材创作')).toBeInTheDocument();
+    expect(screen.getByText('最多 16 张，会随下一次图生图或遮罩编辑发送。')).toBeInTheDocument();
   });
 
   it('keeps prompt editing and generate actions available', async () => {
@@ -79,7 +79,7 @@ describe('generation-form', () => {
       />,
     );
 
-    await user.type(screen.getByLabelText('正向提示词'), '，电影灯光');
+    await user.type(screen.getByLabelText('画面描述'), '，电影灯光');
     expect(onChangeForm).toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: '生成图片' }));
@@ -119,5 +119,33 @@ describe('generation-form', () => {
     expect(onChangeForm).toHaveBeenCalledWith(expect.objectContaining({
       count: 3,
     }));
+  });
+
+  it('disables legacy quality while keeping gpt-image-2 transparent output available', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <GenerationForm
+        form={createDefaultGenerationFormState()}
+        selectedModelLabel="gpt-image-2"
+        supportsReferenceImages
+        canGenerate={false}
+        isGenerating={false}
+        onChangeForm={vi.fn()}
+        onGenerate={vi.fn()}
+        onClear={vi.fn()}
+        onAddReferenceFiles={vi.fn()}
+        onRemoveReferenceImage={vi.fn()}
+        onSelectMaskFile={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /质量/ }));
+    expect(screen.getByRole('option', { name: /DALL-E HD/ })).toHaveAttribute('aria-disabled', 'true');
+    await user.keyboard('{Escape}');
+
+    await user.click(screen.getByText('更多设置', { exact: true }));
+    await user.click(screen.getByRole('button', { name: /背景/ }));
+    expect(screen.getByRole('option', { name: /^透明/ })).not.toHaveAttribute('aria-disabled');
   });
 });

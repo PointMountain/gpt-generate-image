@@ -5,6 +5,9 @@ export interface OpenAIOptionItem {
   badge?: string;
 }
 
+export const DEFAULT_IMAGE_MODEL = 'gpt-image-2';
+export const DEFAULT_IMAGE_QUALITY = 'high';
+
 export const SIZE_OPTIONS: OpenAIOptionItem[] = [
   { value: 'auto', label: '自动' },
   { value: '1024x1024', label: '1024 x 1024' },

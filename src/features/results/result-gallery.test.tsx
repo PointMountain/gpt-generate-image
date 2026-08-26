@@ -19,7 +19,6 @@ describe('result-gallery', () => {
         onPreview={onPreview}
         onDownload={vi.fn()}
         onUseAsReference={vi.fn()}
-        onReusePrompt={vi.fn()}
       />,
     );
 
@@ -34,7 +33,6 @@ describe('result-gallery', () => {
     const user = userEvent.setup();
     const onDownload = vi.fn();
     const onUseAsReference = vi.fn();
-    const onReusePrompt = vi.fn();
 
     render(
       <ResultGallery
@@ -42,18 +40,14 @@ describe('result-gallery', () => {
         onPreview={vi.fn()}
         onDownload={onDownload}
         onUseAsReference={onUseAsReference}
-        onReusePrompt={onReusePrompt}
       />,
     );
 
     await user.click(screen.getByRole('button', { name: '下载' }));
     expect(onDownload).toHaveBeenCalledWith(result, 0);
 
-    await user.click(screen.getByRole('button', { name: '设为参考图' }));
+    await user.click(screen.getByRole('button', { name: '继续创作' }));
     expect(onUseAsReference).toHaveBeenCalledWith(result);
-
-    await user.click(screen.getByRole('button', { name: '复用提示词' }));
-    expect(onReusePrompt).toHaveBeenCalled();
   });
 
   it('renders an inspiration empty state when there are no results', () => {
@@ -63,7 +57,6 @@ describe('result-gallery', () => {
         onPreview={vi.fn()}
         onDownload={vi.fn()}
         onUseAsReference={vi.fn()}
-        onReusePrompt={vi.fn()}
       />,
     );
 

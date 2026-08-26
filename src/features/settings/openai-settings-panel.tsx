@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type {
   OpenAISettingsStoreState,
   OpenAISettingsValidationErrors,
@@ -6,11 +7,16 @@ import type { ImageModelCandidate, ModelDiscoveryFailure } from '../../lib/opena
 import { DropdownField, type DropdownOption } from '../../components/form/dropdown-field';
 import {
   BACKGROUND_OPTIONS as OPENAI_BACKGROUND_OPTIONS,
+  DEFAULT_IMAGE_MODEL,
   FORMAT_OPTIONS as OPENAI_FORMAT_OPTIONS,
   QUALITY_OPTIONS as OPENAI_QUALITY_OPTIONS,
   SIZE_OPTIONS as OPENAI_SIZE_OPTIONS,
 } from '../../lib/openai/openai-option-sets';
 import { ModelPicker, type ModelDiscoveryStatus } from './model-picker';
+import {
+  supportsLegacyImageQuality,
+  supportsTransparentBackground,
+} from '../../lib/openai/ai-sdk-image-client';
 
 interface OpenAISettingsPanelProps {
   settings: OpenAISettingsStoreState;
@@ -24,6 +30,7 @@ interface OpenAISettingsPanelProps {
   onChange: (nextSettings: OpenAISettingsStoreState) => void;
   onSave: () => void;
   onFetchModels?: () => void;
+  showHeading?: boolean;
 }
 
 const SIZE_OPTIONS: DropdownOption[] = OPENAI_SIZE_OPTIONS;
@@ -38,42 +45,86 @@ export function OpenAISettingsPanel({
   onChange,
   onSave,
   onFetchModels = () => undefined,
+  showHeading = true,
 }: OpenAISettingsPanelProps) {
+  const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
+  const supportsDefaultCompression = settings.defaultOutputFormat === 'jpeg' || settings.defaultOutputFormat === 'webp';
+  useEffect(() => {
+    const firstInvalidFieldId = (
+      errors.apiKey ? 'openai-api-key'
+        : errors.model ? 'openai-model'
+          : errors.baseURL ? 'openai-base-url'
+            : errors.timeoutSeconds ? 'openai-timeout'
+              : ''
+    );
+
+    if (firstInvalidFieldId) {
+      document.getElementById(firstInvalidFieldId)?.focus();
+    }
+  }, [errors]);
+
+  const qualityOptions = QUALITY_OPTIONS.map((option) => (
+    ['standard', 'hd'].includes(option.value) && !supportsLegacyImageQuality(settings.model)
+      ? { ...option, disabled: true, description: '仅 DALL-E 模型支持' }
+      : option
+  ));
+  const backgroundOptions = BACKGROUND_OPTIONS.map((option) => (
+    option.value === 'transparent' && (
+      !supportsTransparentBackground(settings.model) || settings.defaultOutputFormat === 'jpeg'
+    )
+      ? {
+          ...option,
+          disabled: true,
+          description: settings.defaultOutputFormat === 'jpeg'
+            ? 'JPEG 不支持透明背景'
+            : `${settings.model || '当前模型'} 暂不支持`,
+        }
+      : option
+  ));
+
   function updateField<K extends keyof OpenAISettingsStoreState>(
     field: K,
     value: OpenAISettingsStoreState[K],
   ) {
-    onChange({
+    const nextSettings: OpenAISettingsStoreState = {
       ...settings,
       [field]: value,
       needsReconfiguration: false,
-    });
+    };
+
+    if (
+      field === 'defaultOutputFormat' &&
+      value === 'jpeg' &&
+      nextSettings.defaultBackground === 'transparent'
+    ) {
+      nextSettings.defaultBackground = 'auto';
+    }
+    if (field === 'defaultOutputFormat' && typeof value === 'string' && !['jpeg', 'webp'].includes(value)) {
+      nextSettings.defaultOutputCompression = 0;
+    }
+
+    onChange(nextSettings);
   }
 
   return (
     <div className="panel-grid panel-grid--compact provider-settings-panel">
-      <div className="surface-header surface-header--tight">
-        <div>
-          <h2>OpenAI 设置</h2>
-          <p>保存 API key、baseURL 和模型后，就可以在创作区直接生成图片。</p>
-        </div>
-        <span className="surface-header__badge">本地浏览器保存</span>
-      </div>
-
-      {settings.needsReconfiguration ? (
-        <div className="section-card section-card--flat">
-          <h3>需要重新配置 OpenAI key</h3>
-          <p>检测到旧 provider 配置。新版本不再读取 baseURL、模型发现或兼容回退，请保存 OpenAI API key 后继续。</p>
+      {showHeading ? (
+        <div className="surface-header surface-header--tight">
+          <div>
+            <h2>连接图像模型</h2>
+            <p>保存 API key、baseURL 和模型后，就可以开始创作。</p>
+          </div>
+          <span className="surface-header__badge">仅保存在本机</span>
         </div>
       ) : null}
 
       <div className="provider-status-card">
         <div>
           <p className="section-heading__eyebrow">Connection</p>
-          <h3>{settings.model || 'gpt-image-1'}</h3>
+          <h3>{settings.model || DEFAULT_IMAGE_MODEL}</h3>
           <p>
             {settings.apiKey
-              ? 'OpenAI key 已填写，可以生成。'
+              ? 'OpenAI key 已填写；可用性会在首次生成时确认。'
               : '填写 OpenAI API key 后即可生成图片。'}
           </p>
         </div>
@@ -88,14 +139,25 @@ export function OpenAISettingsPanel({
         <div className="field-grid">
           <div className="field">
             <label htmlFor="openai-api-key">OpenAI API key</label>
-            <input
-              id="openai-api-key"
-              type="password"
-              autoComplete="off"
-              value={settings.apiKey}
-              onChange={(event) => updateField('apiKey', event.target.value)}
-              placeholder="sk-..."
-            />
+            <div className="secret-input">
+              <input
+                id="openai-api-key"
+                type={isApiKeyVisible ? 'text' : 'password'}
+                autoComplete="off"
+                value={settings.apiKey}
+                onChange={(event) => updateField('apiKey', event.target.value)}
+                placeholder="sk-..."
+              />
+              <button
+                className="secret-input__toggle"
+                type="button"
+                aria-label={`${isApiKeyVisible ? '隐藏' : '显示'} API key`}
+                aria-pressed={isApiKeyVisible}
+                onClick={() => setIsApiKeyVisible((isVisible) => !isVisible)}
+              >
+                {isApiKeyVisible ? '隐藏' : '显示'}
+              </button>
+            </div>
             {errors.apiKey ? <span className="field__error">{errors.apiKey}</span> : null}
           </div>
         </div>
@@ -140,7 +202,7 @@ export function OpenAISettingsPanel({
             id="openai-default-quality"
             label="默认质量"
             value={settings.defaultQuality}
-            options={QUALITY_OPTIONS}
+            options={qualityOptions}
             onChange={(value) => updateField('defaultQuality', value)}
           />
 
@@ -156,7 +218,7 @@ export function OpenAISettingsPanel({
             id="openai-default-background"
             label="默认背景"
             value={settings.defaultBackground}
-            options={BACKGROUND_OPTIONS}
+            options={backgroundOptions}
             onChange={(value) => updateField('defaultBackground', value)}
           />
 
@@ -168,9 +230,12 @@ export function OpenAISettingsPanel({
               min={0}
               max={100}
               value={settings.defaultOutputCompression}
+              disabled={!supportsDefaultCompression}
               onChange={(event) => updateField('defaultOutputCompression', Number(event.target.value))}
             />
-            <span className="field__hint">0 表示不发送 output_compression。</span>
+            <span className="field__hint">
+              {supportsDefaultCompression ? '0 表示不发送 output_compression。' : '仅 JPEG 与 WEBP 支持压缩。'}
+            </span>
           </div>
 
         </div>

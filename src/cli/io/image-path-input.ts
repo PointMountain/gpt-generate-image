@@ -31,8 +31,8 @@ export async function readImageInputFromPath(filePath: string): Promise<ImageBin
     throw new Error(`${filePath} 不是可读取的图片文件。`);
   }
 
-  if (fileStat.size > MAX_IMAGE_FILE_BYTES) {
-    throw new Error(`${basename(absolutePath)} 超过 ${Math.round(MAX_IMAGE_FILE_BYTES / 1024 / 1024)}MB。`);
+  if (fileStat.size >= MAX_IMAGE_FILE_BYTES) {
+    throw new Error(`${basename(absolutePath)} 达到或超过 ${Math.round(MAX_IMAGE_FILE_BYTES / 1024 / 1024)}MB。`);
   }
 
   const bytes = await readFile(absolutePath);
@@ -62,8 +62,8 @@ export async function readReferenceImagesFromPaths(paths: string[]) {
       throw new Error(`${filePath} 不是可读取的图片文件。`);
     }
 
-    if (fileStat.size > MAX_IMAGE_FILE_BYTES) {
-      throw new Error(`${basename(absolutePath)} 超过 ${Math.round(MAX_IMAGE_FILE_BYTES / 1024 / 1024)}MB。`);
+    if (fileStat.size >= MAX_IMAGE_FILE_BYTES) {
+      throw new Error(`${basename(absolutePath)} 达到或超过 ${Math.round(MAX_IMAGE_FILE_BYTES / 1024 / 1024)}MB。`);
     }
 
     return fileStat.size;

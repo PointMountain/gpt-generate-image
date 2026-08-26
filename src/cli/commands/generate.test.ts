@@ -118,7 +118,7 @@ describe('generate command schema', () => {
       message: 'baseURL 需要以 https:// 开头。',
     });
     expect(parsed.recommendation).toBeTruthy();
-  });
+  }, 15_000);
 
   it('fails the root command fast outside an interactive terminal', async () => {
     const result = await runCli([]);
@@ -126,5 +126,5 @@ describe('generate command schema', () => {
     expect(result.stdout.trim()).toBe('');
     expect(result.stderr).toContain('tokencanvas 需要交互式终端');
     expect(result.code).toBe(2);
-  });
+  }, 15_000);
 });

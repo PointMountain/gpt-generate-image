@@ -33,7 +33,7 @@ describe('history-panel', () => {
       />,
     );
 
-    expect(screen.getByText('Recent Inspiration')).toBeInTheDocument();
+    expect(screen.getByText('创作档案')).toBeInTheDocument();
     expect(screen.getByText('1 条记录')).toBeInTheDocument();
     expect(screen.getByText('文生图 · 1024x1024')).toBeInTheDocument();
     expect(screen.getByText('+1')).toBeInTheDocument();
@@ -54,12 +54,16 @@ describe('history-panel', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: '复用提示词' }));
-    await user.click(screen.getByRole('button', { name: '将历史结果 1 设为参考图' }));
+    await user.click(screen.getByRole('button', { name: '应用创作配方' }));
+    await user.click(screen.getByRole('button', { name: '将历史结果 1 加入输入素材' }));
     await user.click(screen.getByRole('button', { name: '删除' }));
 
     expect(onApply).toHaveBeenCalledWith(entry);
     expect(onUseImageAsReference).toHaveBeenCalledWith(entry.images[0]);
+    expect(screen.getByText('确认删除这次创作？')).toBeInTheDocument();
+    expect(onDelete).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: '确认删除' }));
     expect(onDelete).toHaveBeenCalledWith(entry.id);
   });
 });

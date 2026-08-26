@@ -6,7 +6,6 @@ interface ResultCardProps {
   onPreview: (image: ResultImage) => void;
   onDownload: (image: ResultImage, index: number) => void;
   onUseAsReference: (image: ResultImage) => void;
-  onReusePrompt: () => void;
 }
 
 export function ResultCard({
@@ -15,7 +14,6 @@ export function ResultCard({
   onPreview,
   onDownload,
   onUseAsReference,
-  onReusePrompt,
 }: ResultCardProps) {
   const label = `生成结果 ${index + 1}`;
 
@@ -34,6 +32,13 @@ export function ResultCard({
         <div>
           <p className="result-card__eyebrow">Result {index + 1}</p>
           <h4>{label}</h4>
+          {image.width && image.height ? (
+            <p className="result-card__meta">
+              {image.width} × {image.height}
+              {image.dimensionStatus === 'resized' ? ' · 本地校准' : null}
+              {image.dimensionStatus === 'mismatched' ? ' · 端点尺寸不符' : null}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -49,10 +54,7 @@ export function ResultCard({
           type="button"
           onClick={() => onUseAsReference(image)}
         >
-          设为参考图
-        </button>
-        <button className="button button--ghost" type="button" onClick={onReusePrompt}>
-          复用提示词
+          继续创作
         </button>
       </div>
     </article>
