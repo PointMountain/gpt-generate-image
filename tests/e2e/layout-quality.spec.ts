@@ -85,15 +85,27 @@ test.describe('creation workbench layout quality', () => {
     expect(qualityMetrics.scrollWidth).toBeLessThanOrEqual(qualityMetrics.clientWidth);
   });
 
-  test('mobile navigation stays in document flow and never covers controls', async ({ page }) => {
+  test('mobile navigation stays docked while scrolling without covering the final content', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/');
 
-    const position = await page.getByRole('navigation', { name: '移动端主导航' }).evaluate((element) => (
-      getComputedStyle(element).position
-    ));
+    const navigation = page.getByRole('navigation', { name: '移动端主导航' });
+    const initialBox = await navigation.boundingBox();
+    const position = await navigation.evaluate((element) => getComputedStyle(element).position);
 
-    expect(position).toBe('static');
+    expect(position).toBe('fixed');
+    expect(initialBox).not.toBeNull();
+    expect(Math.abs((initialBox?.y ?? 0) + (initialBox?.height ?? 0) - 844)).toBeLessThanOrEqual(1);
+
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+
+    const scrolledBox = await navigation.boundingBox();
+    const finalContentBox = await page.locator('.canvas-shell__content > *').last().boundingBox();
+
+    expect(scrolledBox).not.toBeNull();
+    expect(Math.abs((scrolledBox?.y ?? 0) + (scrolledBox?.height ?? 0) - 844)).toBeLessThanOrEqual(1);
+    expect(finalContentBox).not.toBeNull();
+    expect((finalContentBox?.y ?? 0) + (finalContentBox?.height ?? 0)).toBeLessThanOrEqual(scrolledBox?.y ?? 0);
   });
 
   test('advanced settings summary and fields align as one control group', async ({ page }) => {

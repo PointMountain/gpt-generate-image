@@ -2761,13 +2761,14 @@ button:active:not(:disabled) {
   }
 
   .workbench-frame {
+    --mobile-nav-height: 60px;
+
     display: grid;
     grid-template-columns: 1fr;
     grid-template-areas:
       "mobile-header"
       "composer"
-      "canvas"
-      "mobile-nav";
+      "canvas";
     gap: 0;
     min-height: 100dvh;
   }
@@ -2924,7 +2925,7 @@ button:active:not(:disabled) {
 
   .canvas-shell__content {
     min-height: auto;
-    padding: 0 16px 74px;
+    padding: 0 16px calc(var(--mobile-nav-height) + 14px + env(safe-area-inset-bottom));
   }
 
   .welcome-canvas {
@@ -2991,18 +2992,22 @@ button:active:not(:disabled) {
   }
 
   .workbench-frame__mobile-nav {
-    position: static;
-    z-index: 20;
+    position: fixed;
+    z-index: 30;
+    right: 0;
+    bottom: 0;
+    left: 0;
     display: grid;
-    grid-area: mobile-nav;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    min-height: calc(60px + env(safe-area-inset-bottom));
+    min-height: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom));
+    padding-right: env(safe-area-inset-right);
     padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
     background: var(--ink);
   }
 
   .workbench-frame__mobile-nav button {
-    min-height: 60px;
+    min-height: var(--mobile-nav-height);
     border: 0;
     background: var(--ink);
     color: #aaa398;
