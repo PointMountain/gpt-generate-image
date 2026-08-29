@@ -39,13 +39,11 @@ test('fetches image models and uses custom dropdown controls', async ({ page }) 
   const dialog = page.getByRole('dialog', { name: '连接图像模型' });
   await dialog.getByLabel('OpenAI API key').fill('sk-test');
   await dialog.getByRole('button', { name: '拉取模型' }).click();
-  await expect(page.getByText('已发现 1 个图片模型。')).toBeVisible();
+  await expect(page.getByText('已发现 1 个图片模型，已选择 gpt-image-2。')).toBeVisible();
   expect(modelRequestHeaders?.authorization).toBe('Bearer sk-test');
-  expect(modelRequestHeaders?.['x-openai-base-url']).toBe('https://api.openai.com/v1');
+  expect(modelRequestHeaders?.['x-openai-base-url']).toBe('https://codex.pingchela.xyz/v1');
   expect(modelRequestHeaders?.['x-openai-use-proxy']).toBe('true');
 
-  await dialog.getByRole('button', { name: /图片模型/ }).click();
-  await page.getByRole('option', { name: /GPT Image 2/ }).click();
   await expect(dialog.getByLabel('手动模型 ID')).toHaveValue('gpt-image-2');
 
   await dialog.getByRole('button', { name: '关闭连接设置' }).click();

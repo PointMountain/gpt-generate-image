@@ -294,7 +294,7 @@ test('model discovery shows loading, recovery guidance, and a retryable success 
     });
   });
   await dialog.getByRole('button', { name: '拉取模型' }).click();
-  await expect(page.getByText('已发现 2 个图片模型。')).toBeVisible();
+  await expect(page.getByText('已发现 2 个图片模型，已选择 gpt-image-2。')).toBeVisible();
   await dialog.getByRole('button', { name: /^图片模型 / }).click();
   await capture(page, testInfo, '22-model-discovery-retry-success');
 });
@@ -315,6 +315,7 @@ test('the three-step guide moves focus and can launch a creation round', async (
   await expect(dialog).toBeVisible();
   await capture(page, testInfo, '23-guide-opens-connection');
   await dialog.getByLabel('OpenAI API key').fill('sk-guide-audit');
+  await dialog.getByLabel('手动模型 ID').fill('gpt-image-2');
   await dialog.getByRole('button', { name: '保存 OpenAI 设置' }).click();
   await dialog.getByRole('button', { name: '关闭连接设置' }).click();
 
@@ -467,6 +468,45 @@ test('history and recipes restore a previous creation through visible actions', 
   await capture(page, testInfo, '43-saved-recipe-restored');
 });
 
+test('image history restores its original input after reload and keeps results downloadable', async ({ page }, testInfo) => {
+  const mascotBase64 = (await readFile(mascotPath)).toString('base64');
+  await page.route('**/api/openai/images/edits', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ data: [{ b64_json: mascotBase64 }] }),
+    });
+  });
+
+  await page.goto('/');
+  await configureGeneration(page);
+  await page.getByRole('button', { name: '图生图' }).click();
+  await page.locator('input[type="file"][multiple]').setInputFiles(mascotPath);
+  await page.getByLabel('画面描述').fill('保留原图继续创作');
+  await page.getByRole('button', { name: '生成图片' }).click();
+  await expect(page.getByText('生成完成，共得到 1 张图片。')).toBeVisible();
+
+  await page.reload();
+  await page.getByRole('button', { name: /历史 1/ }).click();
+  const historyCard = page.locator('.stack-card').filter({ hasText: '保留原图继续创作' });
+  await expect(historyCard).toBeVisible();
+  await capture(page, testInfo, '50-image-history-with-download');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await capture(page, testInfo, '51-mobile-image-history-with-download');
+  await page.setViewportSize({ width: 1280, height: 720 });
+
+  const downloadPromise = page.waitForEvent('download');
+  await historyCard.getByRole('button', { name: '下载历史结果 1' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('generated-image-1.png');
+
+  await historyCard.getByRole('button', { name: '应用创作配方' }).click();
+  await expect(page.getByRole('button', { name: '图生图' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByText('1 张输入素材', { exact: true })).toBeVisible();
+  await expect(page.getByAltText('输入素材预览')).toBeVisible();
+  await expect(page.getByText('已恢复创作配方和 1 张输入素材。')).toBeVisible();
+});
+
 test('generation errors progressively disclose provider details', async ({ page }, testInfo) => {
   await page.route('**/api/openai/images/generations', async (route) => {
     await route.fulfill({
@@ -511,6 +551,7 @@ test('advanced connection settings save and reopen with the chosen values', asyn
   await openButton.click();
   let dialog = page.getByRole('dialog', { name: '连接图像模型' });
   await dialog.getByLabel('OpenAI API key').fill('sk-advanced-audit');
+  await dialog.getByLabel('手动模型 ID').fill('gpt-image-2');
   await dialog.locator('details.settings-disclosure > summary').click();
   await dialog.getByLabel('baseURL').fill('https://example.com/v1');
   await dialog.getByLabel('请求超时（秒）').fill('45');

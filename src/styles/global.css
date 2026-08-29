@@ -1337,6 +1337,16 @@ a {
   object-fit: cover;
 }
 
+.stack-card__download-row {
+  margin-bottom: 12px;
+}
+
+.stack-card__download-row .button {
+  min-height: 34px;
+  padding: 0 11px;
+  font-size: 0.8rem;
+}
+
 .inspiration-surface {
   display: grid;
   gap: 14px;

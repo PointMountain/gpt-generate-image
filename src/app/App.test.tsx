@@ -70,6 +70,9 @@ describe('App', () => {
     fireEvent.change(within(dialog).getByLabelText('OpenAI API key'), {
       target: { value: 'sk-test' },
     });
+    fireEvent.change(within(dialog).getByLabelText('手动模型 ID'), {
+      target: { value: 'gpt-image-2' },
+    });
     fireEvent.click(within(dialog).getByRole('button', { name: /默认质量/ }));
     fireEvent.click(screen.getByRole('option', { name: '高质量' }));
     fireEvent.click(within(dialog).getByRole('button', { name: '保存 OpenAI 设置' }));
@@ -120,6 +123,9 @@ describe('App', () => {
     fireEvent.change(within(dialog).getByLabelText('OpenAI API key'), {
       target: { value: 'sk-test' },
     });
+    fireEvent.change(within(dialog).getByLabelText('手动模型 ID'), {
+      target: { value: 'gpt-image-2' },
+    });
     fireEvent.click(within(dialog).getByRole('button', { name: '关闭连接设置' }));
     fireEvent.change(screen.getByLabelText('画面描述'), {
       target: { value: 'warm portrait' },
@@ -134,11 +140,18 @@ describe('App', () => {
     });
   });
 
-  it('fetches image models and lets the user select one', async () => {
+  it('fetches image models and selects gpt-image-2 by default', async () => {
     vi.mocked(fetchOpenAIImageModels).mockResolvedValue({
       ok: true,
       fetchedAt: '2026-05-10T01:00:00.000Z',
       models: [
+        {
+          id: 'gpt-image-1.5',
+          label: 'GPT Image 1.5',
+          family: 'gpt-image',
+          source: 'remote',
+          legacy: false,
+        },
         {
           id: 'gpt-image-2',
           label: 'GPT Image 2',
@@ -161,10 +174,9 @@ describe('App', () => {
       expect(fetchOpenAIImageModels).toHaveBeenCalledTimes(1);
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /图片模型/ }));
-    fireEvent.click(screen.getByRole('option', { name: /GPT Image 2/ }));
-
-    expect(screen.getByLabelText('手动模型 ID')).toHaveValue('gpt-image-2');
+    await waitFor(() => {
+      expect(screen.getByLabelText('手动模型 ID')).toHaveValue('gpt-image-2');
+    });
   });
 
   it('clears discovered model candidates when provider settings change', async () => {

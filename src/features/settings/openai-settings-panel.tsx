@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DEFAULT_BROWSER_OPENAI_BASE_URL } from '../../lib/openai/openai-settings-store';
 import type {
   OpenAISettingsStoreState,
   OpenAISettingsValidationErrors,
@@ -7,7 +8,6 @@ import type { ImageModelCandidate, ModelDiscoveryFailure } from '../../lib/opena
 import { DropdownField, type DropdownOption } from '../../components/form/dropdown-field';
 import {
   BACKGROUND_OPTIONS as OPENAI_BACKGROUND_OPTIONS,
-  DEFAULT_IMAGE_MODEL,
   FORMAT_OPTIONS as OPENAI_FORMAT_OPTIONS,
   QUALITY_OPTIONS as OPENAI_QUALITY_OPTIONS,
   SIZE_OPTIONS as OPENAI_SIZE_OPTIONS,
@@ -121,10 +121,12 @@ export function OpenAISettingsPanel({
       <div className="provider-status-card">
         <div>
           <p className="section-heading__eyebrow">Connection</p>
-          <h3>{settings.model || DEFAULT_IMAGE_MODEL}</h3>
+          <h3>{settings.model || '尚未选择模型'}</h3>
           <p>
             {settings.apiKey
-              ? 'OpenAI key 已填写；可用性会在首次生成时确认。'
+              ? settings.model
+                ? 'OpenAI key 已填写；可用性会在首次生成时确认。'
+                : 'API key 已填写；拉取模型后会优先选择 gpt-image-2。'
               : '填写 OpenAI API key 后即可生成图片。'}
           </p>
         </div>
@@ -257,10 +259,12 @@ export function OpenAISettingsPanel({
               autoComplete="url"
               value={settings.baseURL}
               onChange={(event) => updateField('baseURL', event.target.value)}
-              placeholder="https://api.openai.com/v1"
+              placeholder={DEFAULT_BROWSER_OPENAI_BASE_URL}
             />
             {errors.baseURL ? <span className="field__error">{errors.baseURL}</span> : null}
-            <span className="field__hint">默认使用 OpenAI 官方地址；兼容端点需要支持 OpenAI 图片接口。</span>
+            <span className="field__hint">
+              默认请求 codex.pingchela.xyz；API key 会随请求发送到该端点，也可以改成其他 OpenAI 图片兼容地址。
+            </span>
           </div>
 
           <div className="field">

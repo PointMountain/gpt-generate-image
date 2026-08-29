@@ -36,7 +36,8 @@ describe('openai-settings-store', () => {
     window.localStorage.setItem('gpt-image-workbench/providers', JSON.stringify({ providers: [] }));
 
     expect(loadOpenAISettings()).toMatchObject({
-      model: 'gpt-image-2',
+      baseURL: 'https://codex.pingchela.xyz/v1',
+      model: '',
       timeoutSeconds: 180,
       useProxy: true,
       defaultQuality: 'high',
@@ -47,15 +48,15 @@ describe('openai-settings-store', () => {
   it('keeps static builds in browser API key mode with same-origin proxy enabled', () => {
     expect(createDefaultOpenAISettings()).toMatchObject({
       apiKey: '',
-      baseURL: 'https://api.openai.com/v1',
+      baseURL: 'https://codex.pingchela.xyz/v1',
       useProxy: true,
-      model: 'gpt-image-2',
+      model: '',
       defaultQuality: 'high',
     });
   });
 
   it('validates the required API key and model fields', () => {
-    expect(validateOpenAISettings(createDefaultOpenAISettings())).toMatchObject({
+    expect(validateOpenAISettings(createDefaultOpenAISettings())).toEqual({
       apiKey: 'OpenAI API key 不能为空。',
     });
 
@@ -63,7 +64,7 @@ describe('openai-settings-store', () => {
       apiKey: 'sk-test',
       model: '',
     }))).toMatchObject({
-      model: '模型不能为空，默认使用 gpt-image-2，也可填写兼容端点支持的图片模型。',
+      model: '请选择或填写图片模型。',
     });
   });
 
@@ -81,7 +82,7 @@ describe('openai-settings-store', () => {
 
     expect(loadOpenAISettings()).toMatchObject({
       apiKey: 'sk-test',
-      baseURL: 'https://api.openai.com/v1',
+      baseURL: 'https://codex.pingchela.xyz/v1',
       model: 'gpt-image-2',
       timeoutSeconds: 180,
       useProxy: true,

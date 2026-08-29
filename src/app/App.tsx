@@ -16,6 +16,10 @@ import {
 import { OpenAISettingsPanel } from '../features/settings/openai-settings-panel';
 import type { HistoryEntry, PresetRecord, ResultImage } from '../features/history/history-types';
 import { HistoryPanel } from '../features/history/history-panel';
+import {
+  restoreHistoryInputFile,
+  serializeHistoryInputFile,
+} from '../features/history/history-input-material';
 import { PresetPanel } from '../features/presets/preset-panel';
 import {
   createPreset,
@@ -50,6 +54,7 @@ import {
   type ModelDiscoveryFailure,
 } from '../lib/openai/model-discovery';
 import { normalizeOpenAIBaseURL } from '../lib/openai/openai-endpoint';
+import { DEFAULT_IMAGE_MODEL } from '../lib/openai/openai-option-sets';
 
 const MAX_REFERENCE_IMAGES = 16;
 
@@ -108,11 +113,21 @@ function formMatchesCurrentDefaults(form: GenerationFormState, settings: OpenAIS
   );
 }
 
-function createHistoryEntry(
+async function createHistoryEntry(
   settings: OpenAIImageSettings,
   form: GenerationFormState,
   images: ResultImage[],
-): HistoryEntry {
+): Promise<HistoryEntry> {
+  const storedReferences = await Promise.allSettled(
+    form.referenceImages.map((reference) => serializeHistoryInputFile(reference.file)),
+  );
+  const referenceImages = storedReferences.flatMap((result) => (
+    result.status === 'fulfilled' ? [result.value] : []
+  ));
+  const maskImage = form.maskFile
+    ? await serializeHistoryInputFile(form.maskFile).catch(() => undefined)
+    : undefined;
+
   return {
     id: createHistoryId(),
     modelId: settings.model,
@@ -124,8 +139,8 @@ function createHistoryEntry(
     background: form.background,
     outputCompression: form.outputCompression,
     mode: form.mode,
-    referencePreviewUrls: form.referenceImages.map((reference) => reference.previewUrl),
-    maskPreviewUrl: form.maskPreviewUrl || undefined,
+    referenceImages,
+    maskImage,
     images,
     createdAt: new Date().toISOString(),
   };
@@ -373,7 +388,27 @@ export function App() {
       fetchedAt: result.fetchedAt,
       error: null,
     });
-    setToastMessage(result.models.length ? `已发现 ${result.models.length} 个图片模型。` : '没有发现图片模型，可继续手动填写模型 ID。');
+    const preferredModel = result.models.find((model) => model.id === DEFAULT_IMAGE_MODEL)?.id;
+    const shouldSelectPreferredModel = !settings.model.trim() && Boolean(preferredModel);
+
+    if (shouldSelectPreferredModel && preferredModel) {
+      setSettings((previous) => ({
+        ...previous,
+        model: preferredModel,
+      }));
+      setSettingsErrors((previous) => ({
+        ...previous,
+        model: undefined,
+      }));
+    }
+
+    setToastMessage(
+      shouldSelectPreferredModel
+        ? `已发现 ${result.models.length} 个图片模型，已选择 ${DEFAULT_IMAGE_MODEL}。`
+        : result.models.length
+          ? `已发现 ${result.models.length} 个图片模型。`
+          : '没有发现图片模型，可继续手动填写模型 ID。',
+    );
   }
 
   function handleSettingsChange(nextSettings: OpenAISettingsStoreState) {
@@ -568,9 +603,11 @@ export function App() {
         dimensionStatus: image.dimensionStatus,
       }));
 
+      const historyEntry = await createHistoryEntry(settings, nextForm, nextResults);
+      if (generationIdRef.current !== generationId) {
+        return;
+      }
       setResults(nextResults);
-
-      const historyEntry = createHistoryEntry(settings, nextForm, nextResults);
       setHistoryEntries((previous) => prependHistoryEntry(previous, historyEntry));
       void putHistoryEntry(historyEntry).catch(() => {
         setToastMessage('图片已生成，但写入历史失败。');
@@ -630,21 +667,79 @@ export function App() {
     setToastMessage('已取消本次创作轮次。');
   }
 
-  function applyHistoryEntryToEditor(entry: HistoryEntry) {
-    setForm((previous) => ({
-      ...previous,
-      prompt: entry.prompt,
-      size: entry.size,
-      count: entry.count,
-      quality: entry.quality,
-      outputFormat: entry.outputFormat,
-      background: entry.background,
-      outputCompression: entry.outputCompression,
-      // 历史里的 preview URL 可能是已失效的 blob URL；只恢复可直接再次发送的纯参数。
-      mode: entry.mode === 'mask' ? 'image' : entry.mode,
-      maskPreviewUrl: '',
-      maskFile: null,
-    }));
+  async function applyHistoryEntryToEditor(entry: HistoryEntry) {
+    const durableReferences = entry.referenceImages ?? [];
+    const restoredReferences = durableReferences.flatMap((input) => {
+      try {
+        const file = restoreHistoryInputFile(input);
+        return [{ file, previewUrl: URL.createObjectURL(file) }];
+      } catch {
+        return [];
+      }
+    });
+
+    if (!durableReferences.length && entry.referencePreviewUrls?.length) {
+      const legacyReferences = await Promise.allSettled(
+        entry.referencePreviewUrls.map(async (previewUrl, index) => {
+          const response = await fetch(previewUrl);
+          if (!response.ok && !previewUrl.startsWith('blob:') && !previewUrl.startsWith('data:')) {
+            throw new Error('历史输入素材已不可用。');
+          }
+          const blob = await response.blob();
+          const file = new File([blob], `history-input-${index + 1}`, {
+            type: blob.type || 'application/octet-stream',
+          });
+          return { file, previewUrl: URL.createObjectURL(file) };
+        }),
+      );
+      restoredReferences.push(...legacyReferences.flatMap((result) => (
+        result.status === 'fulfilled' ? [result.value] : []
+      )));
+    }
+
+    let restoredMask: { file: File; previewUrl: string } | null = null;
+    if (entry.maskImage) {
+      try {
+        const file = restoreHistoryInputFile(entry.maskImage);
+        restoredMask = { file, previewUrl: URL.createObjectURL(file) };
+      } catch {
+        restoredMask = null;
+      }
+    }
+
+    setForm((previous) => {
+      revokeReferenceImages(previous.referenceImages);
+      if (previous.maskPreviewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previous.maskPreviewUrl);
+      }
+
+      return {
+        ...previous,
+        prompt: entry.prompt,
+        size: entry.size,
+        count: entry.count,
+        quality: entry.quality,
+        outputFormat: entry.outputFormat,
+        background: entry.background,
+        outputCompression: entry.outputCompression,
+        mode: entry.mode === 'text' ? 'text' : entry.mode === 'mask' && restoredMask ? 'mask' : 'image',
+        referenceImages: restoredReferences,
+        maskPreviewUrl: restoredMask?.previewUrl ?? '',
+        maskFile: restoredMask?.file ?? null,
+      };
+    });
+
+    if (entry.mode === 'text') {
+      setToastMessage('已恢复创作配方。');
+    } else if (restoredReferences.length) {
+      setToastMessage(
+        restoredMask
+          ? `已恢复创作配方、${restoredReferences.length} 张输入素材和 mask。`
+          : `已恢复创作配方和 ${restoredReferences.length} 张输入素材。`,
+      );
+    } else {
+      setToastMessage('创作配方已恢复，原输入素材已不可用，请重新添加。');
+    }
   }
 
   async function handleReuseImageAsReference(image: ResultImage) {
@@ -968,10 +1063,11 @@ export function App() {
           <HistoryPanel
             entries={historyEntries}
             onApply={(entry) => {
-              applyHistoryEntryToEditor(entry);
+              void applyHistoryEntryToEditor(entry);
               showCreateView();
             }}
             onUseImageAsReference={(image) => void handleReuseImageAsReference(image)}
+            onDownload={(image, index) => void handleDownloadResult(image, index)}
             onDelete={(entryId) => void handleDeleteHistory(entryId)}
           />
         )}

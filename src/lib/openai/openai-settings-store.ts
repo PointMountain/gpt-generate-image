@@ -10,6 +10,7 @@ import {
 import { validateOpenAIBaseURL } from './openai-endpoint';
 
 const OPENAI_SETTINGS_KEY = 'gpt-image-workbench/openai-settings';
+export const DEFAULT_BROWSER_OPENAI_BASE_URL = 'https://codex.pingchela.xyz/v1';
 
 export interface OpenAISettingsStoreState extends OpenAIImageSettings {
   needsReconfiguration: boolean;
@@ -25,11 +26,13 @@ export interface OpenAISettingsValidationErrors {
 export function createDefaultOpenAISettings(
   overrides: Partial<OpenAISettingsStoreState> = {},
 ): OpenAISettingsStoreState {
+  const apiKey = overrides.apiKey ?? '';
+
   return {
-    apiKey: '',
-    baseURL: 'https://api.openai.com/v1',
+    apiKey,
+    baseURL: DEFAULT_BROWSER_OPENAI_BASE_URL,
     useProxy: true,
-    model: DEFAULT_IMAGE_MODEL,
+    model: apiKey.trim() ? DEFAULT_IMAGE_MODEL : '',
     timeoutSeconds: 180,
     defaultSize: '1024x1024',
     defaultQuality: DEFAULT_IMAGE_QUALITY,
@@ -71,13 +74,14 @@ function readFiniteNumber(value: unknown, fallback: number, minimum: number, max
 }
 
 function normalizeStoredSettings(stored: Partial<OpenAISettingsStoreState>) {
-  const defaults = createDefaultOpenAISettings();
+  const apiKey = readString(stored.apiKey, '');
+  const defaults = createDefaultOpenAISettings({ apiKey });
 
   return createDefaultOpenAISettings({
-    apiKey: readString(stored.apiKey, defaults.apiKey),
+    apiKey,
     baseURL: readString(stored.baseURL, defaults.baseURL),
     useProxy: typeof stored.useProxy === 'boolean' ? stored.useProxy : defaults.useProxy,
-    model: readString(stored.model, defaults.model),
+    model: apiKey.trim() ? readString(stored.model, defaults.model) : '',
     timeoutSeconds: readFiniteNumber(stored.timeoutSeconds, defaults.timeoutSeconds, 5),
     defaultSize: readEnum(stored.defaultSize, SIZE_VALUES, defaults.defaultSize),
     defaultQuality: readEnum(stored.defaultQuality, QUALITY_VALUES, defaults.defaultQuality),
@@ -117,8 +121,8 @@ export function validateOpenAISettings(settings: OpenAISettingsStoreState) {
     errors.apiKey = 'OpenAI API key 不能为空。';
   }
 
-  if (!settings.model.trim()) {
-    errors.model = '模型不能为空，默认使用 gpt-image-2，也可填写兼容端点支持的图片模型。';
+  if (settings.apiKey.trim() && !settings.model.trim()) {
+    errors.model = '请选择或填写图片模型。';
   }
 
   const baseURLValidation = validateOpenAIBaseURL(settings.baseURL);

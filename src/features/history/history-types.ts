@@ -12,6 +12,12 @@ export interface ResultImage {
   dimensionStatus?: 'matched' | 'resized' | 'mismatched';
 }
 
+export interface HistoryInputImage {
+  dataUrl: string;
+  fileName: string;
+  mimeType: string;
+}
+
 export interface HistoryEntry {
   id: string;
   modelId: string;
@@ -23,6 +29,9 @@ export interface HistoryEntry {
   background: string;
   outputCompression: number;
   mode: GenerationMode;
+  referenceImages?: HistoryInputImage[];
+  maskImage?: HistoryInputImage;
+  /** Legacy preview-only fields kept so older browser records can still be read. */
   referencePreviewUrls?: string[];
   maskPreviewUrl?: string;
   images: ResultImage[];

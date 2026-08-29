@@ -4,6 +4,20 @@ import { createDefaultOpenAISettings } from '../../lib/openai/openai-settings-st
 import { OpenAISettingsPanel } from './openai-settings-panel';
 
 describe('openai-settings-panel', () => {
+  it('shows the configured default endpoint without implying a model before the API key is set', () => {
+    render(
+      <OpenAISettingsPanel
+        settings={createDefaultOpenAISettings()}
+        errors={{}}
+        onChange={vi.fn()}
+        onSave={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText('baseURL')).toHaveValue('https://codex.pingchela.xyz/v1');
+    expect(screen.getByRole('heading', { name: '尚未选择模型' })).toBeInTheDocument();
+  });
+
   it('renders OpenAI-only settings without provider discovery controls', () => {
     render(
       <OpenAISettingsPanel

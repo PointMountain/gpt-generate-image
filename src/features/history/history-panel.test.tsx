@@ -29,6 +29,7 @@ describe('history-panel', () => {
         entries={[entry]}
         onApply={vi.fn()}
         onUseImageAsReference={vi.fn()}
+        onDownload={vi.fn()}
         onDelete={vi.fn()}
       />,
     );
@@ -43,6 +44,7 @@ describe('history-panel', () => {
     const user = userEvent.setup();
     const onApply = vi.fn();
     const onUseImageAsReference = vi.fn();
+    const onDownload = vi.fn();
     const onDelete = vi.fn();
 
     render(
@@ -50,16 +52,19 @@ describe('history-panel', () => {
         entries={[entry]}
         onApply={onApply}
         onUseImageAsReference={onUseImageAsReference}
+        onDownload={onDownload}
         onDelete={onDelete}
       />,
     );
 
     await user.click(screen.getByRole('button', { name: '应用创作配方' }));
     await user.click(screen.getByRole('button', { name: '将历史结果 1 加入输入素材' }));
+    await user.click(screen.getByRole('button', { name: '下载历史结果 1' }));
     await user.click(screen.getByRole('button', { name: '删除' }));
 
     expect(onApply).toHaveBeenCalledWith(entry);
     expect(onUseImageAsReference).toHaveBeenCalledWith(entry.images[0]);
+    expect(onDownload).toHaveBeenCalledWith(entry.images[0], 0);
     expect(screen.getByText('确认删除这次创作？')).toBeInTheDocument();
     expect(onDelete).not.toHaveBeenCalled();
 

@@ -6,7 +6,7 @@ import {
   QUALITY_VALUES,
   SIZE_VALUES,
 } from '../../lib/openai/openai-option-sets';
-import type { HistoryEntry, ResultImage } from './history-types';
+import type { HistoryEntry, HistoryInputImage, ResultImage } from './history-types';
 
 function readString(value: unknown, fallback: string) {
   return typeof value === 'string' ? value : fallback;
@@ -58,6 +58,34 @@ function normalizeImages(value: unknown): ResultImage[] {
   });
 }
 
+function normalizeInputImage(value: unknown): HistoryInputImage | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const image = value as Partial<HistoryInputImage>;
+  if (typeof image.dataUrl !== 'string' || !image.dataUrl.startsWith('data:')) {
+    return undefined;
+  }
+
+  return {
+    dataUrl: image.dataUrl,
+    fileName: readString(image.fileName, 'history-input'),
+    mimeType: readString(image.mimeType, 'application/octet-stream'),
+  };
+}
+
+function normalizeInputImages(value: unknown): HistoryInputImage[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value.flatMap((candidate) => {
+    const image = normalizeInputImage(candidate);
+    return image ? [image] : [];
+  });
+}
+
 export function normalizeHistoryEntry(entry: Partial<HistoryEntry>): HistoryEntry {
   return {
     id: readString(entry.id, `history-${Date.now()}`),
@@ -70,6 +98,8 @@ export function normalizeHistoryEntry(entry: Partial<HistoryEntry>): HistoryEntr
     background: readEnum(entry.background, BACKGROUND_VALUES, 'auto'),
     outputCompression: readNumber(entry.outputCompression, 0, 0, 100),
     mode: normalizeMode(entry.mode),
+    referenceImages: normalizeInputImages(entry.referenceImages),
+    maskImage: normalizeInputImage(entry.maskImage),
     referencePreviewUrls: Array.isArray(entry.referencePreviewUrls)
       ? entry.referencePreviewUrls.filter((url): url is string => typeof url === 'string')
       : undefined,

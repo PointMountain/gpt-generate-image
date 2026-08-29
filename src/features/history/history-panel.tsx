@@ -5,6 +5,7 @@ interface HistoryPanelProps {
   entries: HistoryEntry[];
   onApply: (entry: HistoryEntry) => void;
   onUseImageAsReference: (image: ResultImage) => void;
+  onDownload: (image: ResultImage, index: number) => void;
   onDelete: (entryId: string) => void;
 }
 
@@ -12,6 +13,7 @@ export function HistoryPanel({
   entries,
   onApply,
   onUseImageAsReference,
+  onDownload,
   onDelete,
 }: HistoryPanelProps) {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -42,20 +44,35 @@ export function HistoryPanel({
               </div>
               <p className="stack-card__prompt">{entry.prompt}</p>
               {entry.images.length ? (
-                <div className="stack-card__thumb-row">
-                  {entry.images.slice(0, 2).map((image, index) => (
-                    <button
-                      key={image.id}
-                      className="stack-card__thumb"
-                      type="button"
-                      onClick={() => onUseImageAsReference(image)}
-                      aria-label={`将历史结果 ${index + 1} 加入输入素材`}
-                    >
-                      <img src={image.src} alt="历史结果缩略图" />
-                    </button>
-                  ))}
-                  {entry.images.length > 2 ? <span className="stack-card__count">+{entry.images.length - 2}</span> : null}
-                </div>
+                <>
+                  <div className="stack-card__thumb-row">
+                    {entry.images.slice(0, 2).map((image, index) => (
+                      <button
+                        key={image.id}
+                        className="stack-card__thumb"
+                        type="button"
+                        onClick={() => onUseImageAsReference(image)}
+                        aria-label={`将历史结果 ${index + 1} 加入输入素材`}
+                      >
+                        <img src={image.src} alt="历史结果缩略图" />
+                      </button>
+                    ))}
+                    {entry.images.length > 2 ? <span className="stack-card__count">+{entry.images.length - 2}</span> : null}
+                  </div>
+                  <div className="button-row stack-card__download-row" aria-label="下载历史结果">
+                    {entry.images.map((image, index) => (
+                      <button
+                        key={image.id}
+                        className="button button--ghost"
+                        type="button"
+                        onClick={() => onDownload(image, index)}
+                        aria-label={`下载历史结果 ${index + 1}`}
+                      >
+                        下载 {index + 1}
+                      </button>
+                    ))}
+                  </div>
+                </>
               ) : null}
               {pendingDeleteId === entry.id ? (
                 <div className="inline-delete-confirmation" role="group" aria-label="删除创作确认">
