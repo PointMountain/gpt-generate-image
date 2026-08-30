@@ -41,6 +41,55 @@ async function generateOneResult(page: Page) {
   await expect(page.getByText('生成完成，共得到 1 张图片。')).toBeVisible();
 }
 
+test('use guide plays the real video, exposes registration, and restores focus', async ({ page }, testInfo) => {
+  await page.goto('/');
+  const guideTrigger = page.getByRole('button', { name: '观看 1 分 17 秒使用指南' });
+
+  await capture(page, testInfo, '00-guide-entry-desktop');
+  await guideTrigger.click();
+  const dialog = page.getByRole('dialog', { name: '使用指南' });
+  const video = dialog.getByLabel('中转站与绘图平台使用指南');
+  const registrationLink = dialog.getByRole('link', { name: '打开链接，获取 API Key' });
+  const copyLinkButton = dialog.getByRole('button', { name: '复制注册链接' });
+
+  await expect(dialog.getByRole('button', { name: '关闭使用指南', exact: true })).toBeFocused();
+  await expect(dialog.getByRole('heading', { name: '1 分 17 秒完成首次连接' })).toBeVisible();
+  await expect(video).toHaveAttribute('preload', 'metadata');
+  await expect(video).not.toHaveAttribute('autoplay', '');
+  await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState)).toBeGreaterThanOrEqual(1);
+  expect(await video.evaluate((element: HTMLVideoElement) => element.duration)).toBeGreaterThan(77);
+  await expect(registrationLink).toHaveAttribute(
+    'href',
+    'https://codex.pingchela.xyz/register?aff=4L2D7UE2FAM3',
+  );
+  await expect(registrationLink).toHaveAttribute('target', '_blank');
+  await expect(registrationLink).toBeInViewport();
+  await expect(copyLinkButton).toBeInViewport();
+  await copyLinkButton.click();
+  await expect(copyLinkButton).toContainText('已复制');
+  await capture(page, testInfo, '00-guide-video-desktop');
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(guideTrigger).toBeFocused();
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  await capture(page, testInfo, '00-guide-entry-mobile');
+  await guideTrigger.click();
+  await expect(dialog).toBeVisible();
+  const mobileSheetPosition = await dialog.locator('.guide-video-modal__sheet').evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return {
+      topGap: bounds.top,
+      bottomGap: window.innerHeight - bounds.bottom,
+    };
+  });
+  expect(Math.abs(mobileSheetPosition.topGap - mobileSheetPosition.bottomGap)).toBeLessThanOrEqual(16);
+  await capture(page, testInfo, '00-guide-video-mobile');
+  await dialog.getByRole('button', { name: '关闭使用指南', exact: true }).click();
+  await expect(guideTrigger).toBeFocused();
+});
+
 test('result preview owns focus, closes with Escape, and restores the trigger', async ({ page }, testInfo) => {
   await page.goto('/');
   await configureGeneration(page);

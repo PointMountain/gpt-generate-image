@@ -25,11 +25,11 @@ function resetInitialScroll() {
   window.requestAnimationFrame(() => {
     clearRestoredFormFocus();
     window.scrollTo(0, 0);
+    window.requestAnimationFrame(() => {
+      clearRestoredFormFocus();
+      window.scrollTo(0, 0);
+    });
   });
-  window.setTimeout(() => {
-    clearRestoredFormFocus();
-    window.scrollTo(0, 0);
-  }, 120);
 }
 
 resetInitialScroll();

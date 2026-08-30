@@ -53,6 +53,33 @@ test.describe('creation workbench layout quality', () => {
     }
   });
 
+  test('narrow desktop canvas keeps toolbar and guide card text readable', async ({ page }) => {
+    await page.setViewportSize({ width: 920, height: 900 });
+    await page.goto('/');
+
+    const currentTab = page.locator('.canvas-shell__tabs').getByRole('button', { name: '当前' });
+    const guideCard = page.getByRole('button', { name: '观看 1 分 17 秒使用指南' });
+    const guideHeading = guideCard.locator('.guide-video-card__copy strong');
+    const guideMedia = guideCard.locator('.guide-video-card__media');
+
+    const countTextLines = (element: HTMLElement) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return range.getClientRects().length;
+    };
+    const currentTabLines = await currentTab.evaluate(countTextLines);
+    const guideHeadingLines = await guideHeading.evaluate(countTextLines);
+    const guideCardBox = await guideCard.boundingBox();
+    const guideMediaBox = await guideMedia.boundingBox();
+
+    expect(currentTabLines).toBe(1);
+    expect(guideHeadingLines).toBeLessThanOrEqual(3);
+    expect(guideCardBox).not.toBeNull();
+    expect(guideMediaBox).not.toBeNull();
+    expect((guideMediaBox?.width ?? 0) / (guideCardBox?.width ?? 1)).toBeLessThanOrEqual(0.5);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(920);
+  });
+
   test('dropdown menus are wide enough for their longest option', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');
