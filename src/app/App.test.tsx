@@ -91,6 +91,38 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: '三步开始创作' })).toBeInTheDocument();
   });
 
+  it('opens the use guide and links to the API key registration page', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    render(<App />);
+
+    const guideTrigger = screen.getByRole('button', { name: '观看 1 分 17 秒使用指南' });
+    guideTrigger.focus();
+    fireEvent.click(guideTrigger);
+
+    const dialog = screen.getByRole('dialog', { name: '使用指南' });
+    expect(within(dialog).getByLabelText('中转站与绘图平台使用指南')).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: '打开链接，获取 API Key' })).toHaveAttribute(
+      'href',
+      'https://codex.pingchela.xyz/register?aff=4L2D7UE2FAM3',
+    );
+
+    const copyButton = within(dialog).getByRole('button', { name: '复制注册链接' });
+    fireEvent.click(copyButton);
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith(
+        'https://codex.pingchela.xyz/register?aff=4L2D7UE2FAM3',
+      );
+      expect(copyButton).toHaveTextContent('已复制');
+    });
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '关闭使用指南' }));
+    await waitFor(() => expect(guideTrigger).toHaveFocus());
+  });
+
   it('switches between the creation workbench and the recipe library', () => {
     render(<App />);
 

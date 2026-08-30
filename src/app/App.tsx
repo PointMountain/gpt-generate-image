@@ -5,6 +5,7 @@ import { ToastRegion } from '../components/feedback/toast-region';
 import { ErrorDetailDrawer } from '../components/status/error-detail-drawer';
 import { LoadingState } from '../components/status/loading-state';
 import { ResultPreviewModal } from '../features/results/result-preview-modal';
+import { GuideVideoModal } from '../features/onboarding/guide-video-modal';
 import { ResultGallery } from '../features/results/result-gallery';
 import { downloadImage } from '../features/results/download-image';
 import {
@@ -183,6 +184,7 @@ export function App() {
   const [activeView, setActiveView] = useState<WorkbenchView>('create');
   const [mobileDestination, setMobileDestination] = useState<MobileDestination>('create');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isGuideVideoOpen, setIsGuideVideoOpen] = useState(false);
   const [showGuide, setShowGuide] = useState(true);
   const generationAbortRef = useRef<AbortController | null>(null);
   const generationIdRef = useRef(0);
@@ -937,6 +939,34 @@ export function App() {
         完成连接、写下创作配方，然后让第一张图片落到结果画布。高级参数会在需要时出现。
       </p>
 
+      <button
+        className="guide-video-card"
+        type="button"
+        onClick={() => setIsGuideVideoOpen(true)}
+        aria-label="观看 1 分 17 秒使用指南"
+      >
+        <span className="guide-video-card__media" aria-hidden="true">
+          <img
+            src="/tokencanvas-guide-poster.webp"
+            alt=""
+            width="1280"
+            height="720"
+          />
+          <span className="guide-video-card__play">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M8 5.5v13l10-6.5z" />
+            </svg>
+          </span>
+          <span className="guide-video-card__duration">01:17</span>
+        </span>
+        <span className="guide-video-card__copy">
+          <small>第一次使用？</small>
+          <strong>1 分 17 秒看懂 API key 和图片生成</strong>
+          <span>注册账号 → 创建密钥 → 回到造境连接模型</span>
+          <em>开始观看 →</em>
+        </span>
+      </button>
+
       <section className="welcome-guide" aria-labelledby="welcome-guide-heading">
         <header>
           <h3 id="welcome-guide-heading">三步开始创作</h3>
@@ -1047,15 +1077,26 @@ export function App() {
             历史 <span>{historyEntries.length}</span>
           </button>
         </div>
-        <button
-          type="button"
-          className="model-badge"
-          onClick={openSettings}
-          aria-label="打开模型连接设置"
-        >
-          <span aria-hidden="true" />
-          {settings.model || '选择模型'}
-        </button>
+        <div className="canvas-shell__tools">
+          <button
+            type="button"
+            className="guide-badge"
+            onClick={() => setIsGuideVideoOpen(true)}
+            aria-label="打开使用指南"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z" /></svg>
+            使用指南
+          </button>
+          <button
+            type="button"
+            className="model-badge"
+            onClick={openSettings}
+            aria-label="打开模型连接设置"
+          >
+            <span aria-hidden="true" />
+            {settings.model || '选择模型'}
+          </button>
+        </div>
       </div>
 
       <div ref={canvasRegionRef} className="canvas-shell__content">
@@ -1078,10 +1119,26 @@ export function App() {
   const mobileHeader = (
     <div className="mobile-app-header">
       <strong>造境</strong>
-      <button type="button" onClick={openSettings} aria-label="打开模型连接设置">
-        <span aria-hidden="true" />
-        {settings.model || '选择模型'}
-      </button>
+      <div className="mobile-app-header__actions">
+        <button
+          type="button"
+          className="guide-badge"
+          onClick={() => setIsGuideVideoOpen(true)}
+          aria-label="打开使用指南"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z" /></svg>
+          指南
+        </button>
+        <button
+          type="button"
+          className="mobile-model-badge"
+          onClick={openSettings}
+          aria-label="打开模型连接设置"
+        >
+          <span aria-hidden="true" />
+          {settings.model || '选择模型'}
+        </button>
+      </div>
     </div>
   );
 
@@ -1161,6 +1218,7 @@ export function App() {
 
       <ToastRegion message={toastMessage} />
       <ResultPreviewModal image={previewImage} onClose={() => setPreviewImage(null)} />
+      <GuideVideoModal open={isGuideVideoOpen} onClose={() => setIsGuideVideoOpen(false)} />
     </AppShell>
   );
 }
